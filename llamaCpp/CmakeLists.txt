@@ -1,0 +1,24 @@
+# Version minimale de CMake requise
+cmake_minimum_required(VERSION 3.13)
+
+# Nom de votre projet
+project(LlamaCppWrapper)
+
+# Indique à CMake d'aller voir dans le dossier 'llama.cpp'
+# Il lira le CMakeLists.txt de llama.cpp et créera une cible "llama"
+set(BUILD_SHARED_LIBS ON)
+add_subdirectory(extern/llama.cpp llama_cpp_build)
+
+# Crée votre propre code (par exemple, le glue code JNI)
+add_library(jniLlamaCppWrapper SHARED ${PROJECT_SOURCE_DIR}/src/JniCode.cpp)
+
+
+# Définit le dossier de sortie pour cette bibliothèque spécifique
+set_target_properties(jniLlamaCppWrapper
+    PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs"
+)
+
+# Lie votre code à la bibliothèque llama.
+# CMake s'assure que 'llama' est compilé avant et le lie correctement.
+target_link_libraries(jniLlamaCppWrapper PRIVATE llama)
