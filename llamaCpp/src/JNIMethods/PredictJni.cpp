@@ -9,7 +9,7 @@
 #include <sstream> 
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_nikolaspaci_app_LlamaWrapper_predict(JNIEnv *env, jobject /* this */, jlong session_ptr, jstring prompt_j) {
+Java_com_nikolaspaci_app_LlamaLlmLocal_predict(JNIEnv *env, jobject /* this */, jlong session_ptr, jstring prompt_j) {
   auto* session = reinterpret_cast<LlamaSession*>(session_ptr);
     if (!session) {
         return env->NewStringUTF("Erreur: Session invalide.");

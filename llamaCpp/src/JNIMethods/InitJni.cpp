@@ -2,7 +2,7 @@
 #include "session/LlamaSession.hpp"
 #include "llama-cpp.h"
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_nikolaspaci_app_LlamaWrapper_init(JNIEnv *env, jobject /* this */, jstring modelPath) {
+Java_com_nikolaspaci_app_LlamaLlmLocal_init(JNIEnv *env, jobject /* this */, jstring modelPath) {
     // Initialise the llama backend.
     llama_backend_init();
     // Prepare the parameters for the model and context.
