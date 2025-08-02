@@ -9,9 +9,15 @@ set(SOURCE_FILES_LIST
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/PredictJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/FreeJni.cpp
 )
+if(ANDROID)
+    set(LLAMA_CURL OFF CACHE BOOL "Disable CURL for Android" FORCE)
+    set(LLAMA_INSTALL_LLDB_FORMATTERS OFF CACHE BOOL "Disable lldb formatters for Android" FORCE)
+endif()
+if(NOT ANDROID)
+    find_package(JNI REQUIRED)
+    message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
+endif()
 
-find_package(JNI REQUIRED)
-message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
 # Tell CMake to look into the 'llama.cpp' folder
 # It will read the CMakeLists.txt of llama.cpp and create a "llama" target
 set(BUILD_SHARED_LIBS ON)
@@ -31,6 +37,18 @@ target_include_directories(jniLlamaCppWrapper
     ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
 )
 
+if(ANDROID)
+    if (${ANDROID_ABI} STREQUAL "arm64-v8a")
+        message(STATUS "Building for arm64-v8a")
+        target_compile_options(jniLlamaCppWrapper PRIVATE "-march=armv8.2-a+fp16+dotprod")
+    elseif(${ANDROID_ABI} STREQUAL "armeabi-v7a")
+        # Optimisations pour armeabi-v7a
+        target_compile_options(jniLlamaCppWrapper PRIVATE "-mfpu=neon-vfpv4" "-mfloat-abi=softfp")
+    endif()
+else() # Pour les builds non-Android
+    find_package(JNI REQUIRED)
+endif()
+
 # Define the output directory for this specific library
 set_target_properties(jniLlamaCppWrapper
     PROPERTIES
@@ -40,3 +58,21 @@ set_target_properties(jniLlamaCppWrapper
 # Link code to the llama library.
 # CMake ensures that 'llama' and 'common' are built first and links it correctly.
 target_link_libraries(jniLlamaCppWrapper PRIVATE llama common)
+
+# --- Test executable ---
+if(NOT ANDROID)
+    enable_testing()
+    add_executable(jni_methods_test tests/JniMethods_test.cpp)
+
+    # Add include directories for the test executable so it can find jni.h etc.
+    target_include_directories(jni_methods_test
+        PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${JNI_INCLUDE_DIRS}
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
+    )
+
+    # Link the test executable to the main library and other dependencies
+    target_link_libraries(jni_methods_test PRIVATE jniLlamaCppWrapper)
+endif()

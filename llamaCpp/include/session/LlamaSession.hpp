@@ -2,6 +2,7 @@
 #define LLAMA_SESSION_HPP
 
 #include "llama-cpp.h"
+#include "llama.h"
 
 struct LlamaSession {
     llama_model_ptr model;

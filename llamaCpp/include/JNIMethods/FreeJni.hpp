@@ -4,6 +4,6 @@
 #include "jni.h"
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_nikolaspaci_app_LlamaLlmLocal_free(JNIEnv *env, jobject /* this */, jlong session_ptr) ;
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_free(JNIEnv *env, jobject /* this */, jlong session_ptr) ;
 
 #endif // FREEJNI_HPP

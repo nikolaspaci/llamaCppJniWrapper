@@ -2,11 +2,13 @@
 #include "session/LlamaSession.hpp"
 #include "llama-cpp.h"
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_nikolaspaci_app_LlamaLlmLocal_init(JNIEnv *env, jobject /* this */, jstring modelPath) {
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(JNIEnv *env, jobject /* this */, jstring modelPath) {
     // Initialise the llama backend.
     llama_backend_init();
     // Prepare the parameters for the model and context.
     llama_model_params model_params = llama_model_default_params();
+    model_params.use_mmap = true; // Use memory-mapped files for model loading.
+    model_params.use_mlock = false;
     llama_context_params ctx_params = llama_context_default_params();
 
     // You can adjust parameters here if needed. For example:

@@ -9,7 +9,7 @@
 #include <sstream> 
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_nikolaspaci_app_LlamaLlmLocal_predict(JNIEnv *env, jobject /* this */, jlong session_ptr, jstring prompt_j) {
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* this */, jlong session_ptr, jstring prompt_j) {
   auto* session = reinterpret_cast<LlamaSession*>(session_ptr);
     if (!session) {
         return env->NewStringUTF("Erreur: Session invalide.");
@@ -35,13 +35,15 @@ Java_com_nikolaspaci_app_LlamaLlmLocal_predict(JNIEnv *env, jobject /* this */, 
     const int n_ctx = llama_n_ctx(context);
     const int n_batch = llama_n_batch(context);
     const int max_batch_size = std::min(n_batch, 512);
+
+    const char* chat_template = llama_model_chat_template(model, nullptr);
+
     
     llama_batch batch = llama_batch_init(max_batch_size, 0, 1);
 
     // Processing the prompt in chunks with common_batch_add
     int processed_tokens = 0;
     const int n_tokens = tokens.size();
-    
     while (processed_tokens < n_tokens) {
         const int chunk_size = std::min(max_batch_size, n_tokens - processed_tokens);
 
