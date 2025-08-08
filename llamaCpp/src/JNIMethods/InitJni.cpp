@@ -14,6 +14,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(JNIEnv *env, jobject /* thi
     // You can adjust parameters here if needed. For example:
     ctx_params.n_ctx = 2048; // Context size.
     ctx_params.n_threads = 4; // Number of CPU threads to use.
+    ctx_params.no_perf = true; // Disable performance monitoring.
 
     // Create a session on the heap
     auto* session = new LlamaSession();
