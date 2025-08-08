@@ -53,7 +53,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
     llama_batch batch = llama_batch_init(n_ctx, 0, 1);
 
     // Processing the prompt
-    int processed_tokens = 0;
+    int processed_tokens = session->n_past;
     const int n_tokens = tokens.size();
     while (processed_tokens < n_tokens) {
         const int chunk_size = std::min(n_ctx, n_tokens - processed_tokens);
@@ -83,6 +83,9 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
         return env->NewStringUTF("Erreur d'initialisation du sampler.");
     }
 
+        auto start_time = std::chrono::high_resolution_clock::now();
+    int tokens_generated = 0;
+
     // Generation loop
     for (int i = 0; i < max_new_tokens && n_cur < n_ctx; ++i) {
         const llama_token new_token_id = common_sampler_sample(smpl, context, batch.n_tokens - 1);
@@ -102,7 +105,15 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
             break;
         }
         n_cur++;
+        tokens_generated++;
     }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    double tokens_per_second = (double)tokens_generated / (duration.count() / 1000.0);
+    std::cout << "tokens_generated: " << tokens_generated << std::endl;
+    std::cout << "Generation took " << duration.count() << " ms, " << tokens_per_second << " tokens/sec" << std::endl;
+
+    session->n_past = n_cur;
 
     common_sampler_free(smpl);
     llama_batch_free(batch);
