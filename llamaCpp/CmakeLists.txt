@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Set release build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 project(LlamaCppWrapper)
 
 set(SOURCE_FILES_LIST
@@ -9,26 +14,30 @@ set(SOURCE_FILES_LIST
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/PredictJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/FreeJni.cpp
 )
+
 if(ANDROID)
     set(LLAMA_CURL OFF CACHE BOOL "Disable CURL for Android" FORCE)
     set(LLAMA_INSTALL_LLDB_FORMATTERS OFF CACHE BOOL "Disable lldb formatters for Android" FORCE)
+    set(ANDROID_ARM_NEON ON CACHE BOOL "Enable NEON" FORCE)
+    
+    # Optimisations GGML pour Android
+    set(GGML_NATIVE OFF CACHE BOOL "Disable native optimizations" FORCE)
+    set(GGML_OPENMP ON CACHE BOOL "Enable OpenMP" FORCE)
+
 endif()
+
 if(NOT ANDROID)
     find_package(JNI REQUIRED)
     message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
 endif()
 
-# Tell CMake to look into the 'llama.cpp' folder
-# It will read the CMakeLists.txt of llama.cpp and create a "llama" target
 set(BUILD_SHARED_LIBS ON)
-#indicate that will use common utils
 set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common utils library" FORCE)
 
 add_subdirectory(extern/llama.cpp llama_cpp_build)
 
 add_library(jniLlamaCppWrapper SHARED ${SOURCE_FILES_LIST})
 
-#include header dir
 target_include_directories(jniLlamaCppWrapper
     PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -39,32 +48,36 @@ target_include_directories(jniLlamaCppWrapper
 
 if(ANDROID)
     if (${ANDROID_ABI} STREQUAL "arm64-v8a")
-        message(STATUS "Building for arm64-v8a")
-        target_compile_options(jniLlamaCppWrapper PRIVATE "-march=armv8.2-a+fp16+dotprod")
-    elseif(${ANDROID_ABI} STREQUAL "armeabi-v7a")
-        # Optimisations pour armeabi-v7a
-        target_compile_options(jniLlamaCppWrapper PRIVATE "-mfpu=neon-vfpv4" "-mfloat-abi=softfp")
+        target_compile_options(jniLlamaCppWrapper PRIVATE
+            -DGGML_USE_CPU 
+            -DGGML_USE_CPU_AARCH64
+            -DGGML_CPU_ARM_ARCH=armv9-a
+            -DGGML_F16C=ON
+            -DGGML_FMA=ON
+                -DLLAMA_VULKAN=1
+            "-march=armv9-a+sve2+sme2+bf16+sve2+dotprod+fp16fml+i8mm"
+            -O3
+            -ffunction-sections -fdata-sections
+            -fno-exceptions -fno-rtti
+            -fvisibility=hidden
+        )
     endif()
-else() # Pour les builds non-Android
+else()
+    target_compile_options(jniLlamaCppWrapper PRIVATE -march=native -O3)
     find_package(JNI REQUIRED)
 endif()
 
-# Define the output directory for this specific library
 set_target_properties(jniLlamaCppWrapper
     PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs"
 )
 
-# Link code to the llama library.
-# CMake ensures that 'llama' and 'common' are built first and links it correctly.
 target_link_libraries(jniLlamaCppWrapper PRIVATE llama common)
 
-# --- Test executable ---
+# Test executable (inchangé)
 if(NOT ANDROID)
     enable_testing()
     add_executable(jni_methods_test tests/JniMethods_test.cpp)
-
-    # Add include directories for the test executable so it can find jni.h etc.
     target_include_directories(jni_methods_test
         PRIVATE
         ${PROJECT_SOURCE_DIR}/include
@@ -72,7 +85,5 @@ if(NOT ANDROID)
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
     )
-
-    # Link the test executable to the main library and other dependencies
     target_link_libraries(jni_methods_test PRIVATE jniLlamaCppWrapper)
 endif()
