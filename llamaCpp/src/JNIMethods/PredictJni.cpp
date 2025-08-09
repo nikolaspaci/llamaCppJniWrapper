@@ -23,7 +23,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     if (callback_class == nullptr) { return; }
 
     jmethodID on_token_method   = env->GetMethodID(callback_class, "onToken",   "(Ljava/lang/String;)V");
-    jmethodID on_complete_method = env->GetMethodID(callback_class, "onComplete", "()V");
+    jmethodID on_complete_method = env->GetMethodID(callback_class, "onComplete", "(DJ)V");
     jmethodID on_error_method   = env->GetMethodID(callback_class, "onError",   "(Ljava/lang/String;)V");
 
     // Vérifie que toutes les méthodes ont été trouvées
@@ -142,9 +142,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    double tokens_per_second = (double)tokens_generated / (duration.count() / 1000.0);
-    std::cout << "tokens_generated: " << tokens_generated << std::endl;
-    std::cout << "Generation took " << duration.count() << " ms, " << tokens_per_second << " tokens/sec" << std::endl;
+    const long duration_count_seconds = duration.count() / 1000;
+    const double tokens_per_second = (double)tokens_generated / (duration.count() / 1000.0);
 
     session->n_past = n_cur;
 
@@ -161,6 +160,14 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
         env->CallVoidMethod(callback_obj, on_error_method, env->NewStringUTF("Erreur lors de la création de la chaîne de résultat."));
         return;
     }
+
+    env->CallVoidMethod(
+        callback_obj,
+        on_complete_method,
+        tokens_per_second,
+        duration_count_seconds
+    );
+
     env->CallVoidMethod(callback_obj, on_complete_method);
 
 }
