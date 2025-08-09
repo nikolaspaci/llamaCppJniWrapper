@@ -2,7 +2,7 @@ package com.nikolaspaci.app.llamallmlocal.ui.chat
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
@@ -33,37 +33,12 @@ fun ChatScreen(
     onOpenDrawer: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val conversation by viewModel.conversation.collectAsState()
     var selectedModelPath by remember(conversation) {
         mutableStateOf(conversation?.modelPath ?: "")
     }
 
-    if (showDeleteConfirmationDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmationDialog = false },
-            title = { Text("Delete Chat") },
-            text = { Text("Are you sure you want to delete this chat? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            viewModel.deleteConversation()
-                            showDeleteConfirmationDialog = false
-                        }
-                    }
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                Button(onClick = { showDeleteConfirmationDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -106,6 +81,7 @@ fun ChatScreen(
                 MessageList(
                     messages = state.messages,
                     streamingMessage = state.streamingMessage,
+                    lastMessageStats = state.lastMessageStats,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -130,6 +106,7 @@ fun ChatScreen(
 fun MessageList(
     messages: List<ChatMessage>,
     streamingMessage: String?,
+    lastMessageStats: com.nikolaspaci.app.llamallmlocal.viewmodel.Stats?,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -139,8 +116,12 @@ fun MessageList(
         state = listState,
         modifier = modifier.padding(8.dp)
     ) {
-        items(messages) { message ->
-            MessageRow(message)
+        itemsIndexed(messages) { index, message ->
+            val isLastMessage = index == messages.lastIndex
+            MessageRow(
+                message = message,
+                stats = if (isLastMessage && message.sender == Sender.BOT) lastMessageStats else null
+            )
         }
         if (streamingMessage != null) {
             item {
@@ -184,7 +165,7 @@ fun MessageList(
 }
 
 @Composable
-fun MessageRow(message: ChatMessage) {
+fun MessageRow(message: ChatMessage, stats: com.nikolaspaci.app.llamallmlocal.viewmodel.Stats? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,10 +177,19 @@ fun MessageRow(message: ChatMessage) {
                 containerColor = if (message.sender == Sender.USER) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
             )
         ) {
-            Text(
-                text = message.message,
-                modifier = Modifier.padding(8.dp)
-            )
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = message.message
+                )
+                if (stats != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%.2f t/s, %d s".format(stats.tokensPerSecond, stats.durationInSeconds),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

@@ -3,23 +3,23 @@ package com.nikolaspaci.app.llamallmlocal.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
+import com.nikolaspaci.app.llamallmlocal.data.database.Conversation
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.data.repository.ChatRepository
 import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
+import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.logging.Logger
 
-import com.nikolaspaci.app.llamallmlocal.data.database.Conversation
-import com.nikolaspaci.app.llamallmlocal.data.database.ConversationWithMessages
-import kotlinx.coroutines.flow.filterNotNull
+data class Stats(val tokensPerSecond: Double, val durationInSeconds: Long)
 
 class ChatViewModel(
     private val chatRepository: ChatRepository,
@@ -51,9 +51,15 @@ class ChatViewModel(
                     } else {
                         null
                     }
+                    val lastMessageStats = if (currentUiState is ChatUiState.Success) {
+                        currentUiState.lastMessageStats
+                    } else {
+                        null
+                    }
                     _uiState.value = ChatUiState.Success(
                         messages = conversationWithMessages.messages,
-                        streamingMessage = streamingMessage
+                        streamingMessage = streamingMessage,
+                        lastMessageStats = lastMessageStats
                     )
                 }
             }
@@ -89,18 +95,26 @@ class ChatViewModel(
         viewModelScope.launch {
             chatRepository.addMessageToConversation(userMessage)
 
-            // Show loading indicator for bot response
+            // Clear old stats and show loading indicator
             (_uiState.value as? ChatUiState.Success)?.let {
-                _uiState.value = it.copy(streamingMessage = "")
+                _uiState.value = it.copy(streamingMessage = "", lastMessageStats = null)
             }
 
-            // Get bot response
             val botMessageFlow = llamaJniService.predict(text)
             var accumulatedResponse = ""
-            botMessageFlow.collect { response ->
-                accumulatedResponse += response
-                (_uiState.value as? ChatUiState.Success)?.let {
-                    _uiState.value = it.copy(streamingMessage = accumulatedResponse)
+            var finalStats: Stats? = null
+
+            botMessageFlow.collect { event ->
+                when (event) {
+                    is PredictionEvent.Token -> {
+                        accumulatedResponse += event.value
+                        (_uiState.value as? ChatUiState.Success)?.let {
+                            _uiState.value = it.copy(streamingMessage = accumulatedResponse)
+                        }
+                    }
+                    is PredictionEvent.Completion -> {
+                        finalStats = Stats(event.tokensPerSecond, event.durationInSeconds)
+                    }
                 }
             }
 
@@ -112,9 +126,9 @@ class ChatViewModel(
             )
             chatRepository.addMessageToConversation(botChatMessage)
 
-            // Hide loading/streaming indicator
+            // Hide streaming indicator and show stats
             (_uiState.value as? ChatUiState.Success)?.let {
-                _uiState.value = it.copy(streamingMessage = null)
+                _uiState.value = it.copy(streamingMessage = null, lastMessageStats = finalStats)
             }
         }
     }
@@ -142,7 +156,8 @@ sealed class ChatUiState {
     object Loading : ChatUiState()
     data class Success(
         val messages: List<ChatMessage>,
-        val streamingMessage: String? = null
+        val streamingMessage: String? = null,
+        val lastMessageStats: Stats? = null // Stats for the most recent bot message
     ) : ChatUiState()
     data class Error(val message: String) : ChatUiState()
 }
