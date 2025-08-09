@@ -1,7 +1,7 @@
 package com.nikolaspaci.app.llamallmlocal.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -66,7 +66,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                             scope.launch { drawerState.close() }
                         }
                     )
-                    Divider()
+                    HorizontalDivider()
                     Text(
                         text = "Chats",
                         style = MaterialTheme.typography.titleMedium,
