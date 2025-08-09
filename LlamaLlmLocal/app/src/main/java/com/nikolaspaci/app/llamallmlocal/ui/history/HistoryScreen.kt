@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.data.database.ConversationWithMessages
+import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.ui.settings.ModelSelectionDialog
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryUiState
@@ -149,6 +150,11 @@ fun ConversationRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val title = conversationWithMessages.messages
+        .firstOrNull { it.sender == Sender.USER }
+        ?.let { "Chat: '${it.message.take(25)}...'" }
+        ?: "Conversation #${conversationWithMessages.conversation.id}"
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -160,7 +166,7 @@ fun ConversationRow(
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(
-                text = "Conversation #${conversationWithMessages.conversation.id}",
+                text = title,
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
