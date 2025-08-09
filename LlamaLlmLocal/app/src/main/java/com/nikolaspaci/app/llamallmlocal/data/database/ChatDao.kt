@@ -1,6 +1,7 @@
 package com.nikolaspaci.app.llamallmlocal.data.database
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
@@ -21,10 +22,13 @@ interface ChatDao {
 
     @Transaction
     @Query("SELECT * FROM conversations WHERE id = :conversationId")
-    fun getConversationWithMessages(conversationId: Long): Flow<ConversationWithMessages>
+    fun getConversationWithMessages(conversationId: Long): Flow<ConversationWithMessages?>
 
     @Query("UPDATE conversations SET modelPath = :modelPath WHERE id = :conversationId")
     suspend fun updateConversationModelPath(conversationId: Long, modelPath: String)
+
+    @Delete
+    suspend fun deleteConversation(conversation: Conversation)
 }
 
 data class ConversationWithMessages(

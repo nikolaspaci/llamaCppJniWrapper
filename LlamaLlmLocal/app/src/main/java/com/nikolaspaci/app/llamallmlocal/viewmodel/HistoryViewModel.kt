@@ -32,6 +32,12 @@ class HistoryViewModel(
         val conversation = Conversation(modelPath = modelPath)
         return chatRepository.insertConversation(conversation)
     }
+
+    fun deleteConversation(conversation: ConversationWithMessages) {
+        viewModelScope.launch {
+            chatRepository.deleteConversation(conversation.conversation)
+        }
+    }
 }
 
 sealed class HistoryUiState {

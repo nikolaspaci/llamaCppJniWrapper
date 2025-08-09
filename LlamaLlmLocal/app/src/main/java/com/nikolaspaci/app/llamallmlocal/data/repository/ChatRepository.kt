@@ -12,7 +12,7 @@ class ChatRepository(private val chatDao: ChatDao) {
         return chatDao.getAllConversationsWithMessages()
     }
 
-    fun getConversation(conversationId: Long): Flow<ConversationWithMessages> {
+    fun getConversation(conversationId: Long): Flow<ConversationWithMessages?> {
         return chatDao.getConversationWithMessages(conversationId)
     }
 
@@ -26,5 +26,9 @@ class ChatRepository(private val chatDao: ChatDao) {
 
     suspend fun updateConversationModel(conversationId: Long, modelPath: String) {
         chatDao.updateConversationModelPath(conversationId, modelPath)
+    }
+
+    suspend fun deleteConversation(conversation: Conversation) {
+        chatDao.deleteConversation(conversation)
     }
 }

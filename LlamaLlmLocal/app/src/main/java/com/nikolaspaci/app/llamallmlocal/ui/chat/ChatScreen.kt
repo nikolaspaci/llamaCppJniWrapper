@@ -32,6 +32,34 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showMenu by remember { mutableStateOf(false) }
     var showModelSelectionDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showDeleteConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmationDialog = false },
+            title = { Text("Delete Chat") },
+            text = { Text("Are you sure you want to delete this chat? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            viewModel.deleteConversation()
+                            showDeleteConfirmationDialog = false
+                            onNavigateBack()
+                        }
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteConfirmationDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     if (showModelSelectionDialog) {
         ModelSelectionDialog(
@@ -66,6 +94,13 @@ fun ChatScreen(
                             text = { Text("Change Model") },
                             onClick = {
                                 showModelSelectionDialog = true
+                                showMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete Chat") },
+                            onClick = {
+                                showDeleteConfirmationDialog = true
                                 showMenu = false
                             }
                         )

@@ -1,6 +1,8 @@
 package com.nikolaspaci.app.llamallmlocal.ui.history
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,7 +22,7 @@ import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel,
@@ -32,6 +34,24 @@ fun HistoryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     var showDialog by remember { mutableStateOf(false) }
+    var conversationToDelete by remember { mutableStateOf<ConversationWithMessages?>(null) }
+
+    if (conversationToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { conversationToDelete = null },
+            title = { Text("Delete Conversation") },
+            text = { Text("Are you sure you want to permanently delete this conversation?") },
+            confirmButton = {
+                Button(onClick = {
+                    conversationToDelete?.let { viewModel.deleteConversation(it) }
+                    conversationToDelete = null // Dismiss dialog
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                Button(onClick = { conversationToDelete = null }) { Text("Cancel") }
+            }
+        )
+    }
 
     if (showDialog) {
         ModelSelectionDialog(
@@ -78,7 +98,10 @@ fun HistoryScreen(
                     } else {
                         ConversationList(
                             conversations = state.conversations,
-                            onConversationClick = onConversationClick
+                            onConversationClick = onConversationClick,
+                            onConversationLongPress = { conversation ->
+                                conversationToDelete = conversation
+                            }
                         )
                     }
                 }
@@ -101,28 +124,39 @@ fun EmptyHistoryView() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConversationList(
     conversations: List<ConversationWithMessages>,
-    onConversationClick: (Long) -> Unit
+    onConversationClick: (Long) -> Unit,
+    onConversationLongPress: (ConversationWithMessages) -> Unit
 ) {
     LazyColumn(modifier = Modifier.padding(8.dp)) {
         items(conversations) { conversation ->
-            ConversationRow(conversation, onConversationClick)
+            ConversationRow(
+                conversationWithMessages = conversation,
+                onClick = { onConversationClick(conversation.conversation.id) },
+                onLongClick = { onConversationLongPress(conversation) }
+            )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConversationRow(
     conversationWithMessages: ConversationWithMessages,
-    onConversationClick: (Long) -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { onConversationClick(conversationWithMessages.conversation.id) }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(

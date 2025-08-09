@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,26 +33,28 @@ class ChatViewModel(
         // Observe messages and update UI
         viewModelScope.launch {
             chatRepository.getConversation(conversationId).collect { conversationWithMessages ->
-                val currentUiState = _uiState.value
-                val streamingMessage = if (currentUiState is ChatUiState.Success) {
-                    currentUiState.streamingMessage
-                } else {
-                    null
+                if (conversationWithMessages != null) {
+                    val currentUiState = _uiState.value
+                    val streamingMessage = if (currentUiState is ChatUiState.Success) {
+                        currentUiState.streamingMessage
+                    } else {
+                        null
+                    }
+                    _uiState.value = ChatUiState.Success(
+                        messages = conversationWithMessages.messages,
+                        streamingMessage = streamingMessage
+                    )
                 }
-                _uiState.value = ChatUiState.Success(
-                    messages = conversationWithMessages.messages,
-                    streamingMessage = streamingMessage
-                )
             }
         }
 
         // Observe model path and load model when it changes
         viewModelScope.launch {
             chatRepository.getConversation(conversationId)
-                .map { it.conversation.modelPath }
+                .map { it?.conversation?.modelPath }
                 .distinctUntilChanged()
                 .collect { modelPath ->
-                    if (modelPath.isNotEmpty()) {
+                    if (modelPath?.isNotEmpty() == true) {
                         _isModelReady.value = false
                         withContext(Dispatchers.IO) {
                             llamaJniService.loadModel(modelPath)
@@ -106,6 +109,13 @@ class ChatViewModel(
     fun changeModel(modelPath: String) {
         viewModelScope.launch {
             chatRepository.updateConversationModel(conversationId, modelPath)
+        }
+    }
+
+    suspend fun deleteConversation() {
+        // We need to fetch the conversation object first to delete it
+        chatRepository.getConversation(conversationId).firstOrNull()?.let {
+            chatRepository.deleteConversation(it.conversation)
         }
     }
 
