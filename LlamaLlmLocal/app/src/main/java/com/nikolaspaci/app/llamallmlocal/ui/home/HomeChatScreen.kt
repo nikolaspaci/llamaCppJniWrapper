@@ -22,7 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.common.AppTopAppBar
+import com.nikolaspaci.app.llamallmlocal.ui.common.MessageInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HomeViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
@@ -36,13 +39,15 @@ fun HomeChatScreen(
     onStartChat: (Long, String) -> Unit,
     onOpenDrawer: () -> Unit
 ) {
-    var userInput by remember { mutableStateOf("") }
     var selectedModelPath by remember { mutableStateOf(settingsViewModel.getModelPath() ?: "") }
     val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
-            AppTopAppBar(title = "Home", onOpenDrawer = onOpenDrawer)
+            AppTopAppBar(
+                title = "",
+                onOpenDrawer = onOpenDrawer
+            )
         }
     ) { padding ->
         Column(
@@ -58,13 +63,20 @@ fun HomeChatScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            OutlinedTextField(
-                value = userInput,
-                onValueChange = { userInput = it },
-                label = { Text("Enter your prompt") },
-                modifier = Modifier.fillMaxWidth()
+
+
+            MessageInput(
+                onSendMessage = { userInput ->
+                    if (selectedModelPath.isNotEmpty()) {
+                        scope.launch {
+                            val newConversationId = homeViewModel.startNewConversation(selectedModelPath)
+                            onStartChat(newConversationId, userInput)
+                        }
+                    }
+                },
+                isEnabled = selectedModelPath.isNotEmpty()
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             ModelSelector(
                 settingsViewModel = settingsViewModel,
                 selectedModelPath = selectedModelPath,
@@ -74,21 +86,6 @@ fun HomeChatScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    if (selectedModelPath.isNotEmpty() && userInput.isNotBlank()) {
-                        scope.launch {
-                            val newConversationId = homeViewModel.startNewConversation(selectedModelPath)
-                            onStartChat(newConversationId, userInput)
-                        }
-                    }
-                },
-                modifier = Modifier.padding(top = 8.dp),
-                enabled = selectedModelPath.isNotEmpty() && userInput.isNotBlank()
-            ) {
-                Text("Send")
-            }
         }
     }
 }

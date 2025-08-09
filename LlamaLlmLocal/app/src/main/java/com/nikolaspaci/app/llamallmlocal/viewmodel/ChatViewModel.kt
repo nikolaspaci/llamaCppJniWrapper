@@ -17,6 +17,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.logging.Logger
 
+import com.nikolaspaci.app.llamallmlocal.data.database.Conversation
+import com.nikolaspaci.app.llamallmlocal.data.database.ConversationWithMessages
+import kotlinx.coroutines.flow.filterNotNull
+
 class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val llamaJniService: LlamaJniService,
@@ -30,6 +34,9 @@ class ChatViewModel(
     private val _isModelReady = MutableStateFlow(false)
     val isModelReady: StateFlow<Boolean> = _isModelReady.asStateFlow()
 
+    private val _conversation = MutableStateFlow<Conversation?>(null)
+    val conversation: StateFlow<Conversation?> = _conversation.asStateFlow()
+
     private var initialMessageSent = false
 
     init {
@@ -37,6 +44,7 @@ class ChatViewModel(
         viewModelScope.launch {
             chatRepository.getConversation(conversationId).collect { conversationWithMessages ->
                 if (conversationWithMessages != null) {
+                    _conversation.value = conversationWithMessages.conversation
                     val currentUiState = _uiState.value
                     val streamingMessage = if (currentUiState is ChatUiState.Success) {
                         currentUiState.streamingMessage
@@ -53,25 +61,22 @@ class ChatViewModel(
 
         // Observe model path and load model when it changes
         viewModelScope.launch {
-            chatRepository.getConversation(conversationId)
-                .map { it?.conversation?.modelPath }
-                .distinctUntilChanged()
-                .collect { modelPath ->
-                    if (modelPath?.isNotEmpty() == true) {
-                        _isModelReady.value = false
-                        withContext(Dispatchers.IO) {
-                            llamaJniService.loadModel(modelPath)
-                        }
-                        _isModelReady.value = true
-                        // If there's an initial message, send it after the model is loaded.
-                        if (initialMessage != null && !initialMessageSent) {
-                            sendMessage(initialMessage)
-                            initialMessageSent = true
-                        }
-                    } else {
-                        _isModelReady.value = false
+            conversation.filterNotNull().map { it.modelPath }.distinctUntilChanged().collect { modelPath ->
+                if (modelPath.isNotEmpty()) {
+                    _isModelReady.value = false
+                    withContext(Dispatchers.IO) {
+                        llamaJniService.loadModel(modelPath)
                     }
+                    _isModelReady.value = true
+                    // If there's an initial message, send it after the model is loaded.
+                    if (initialMessage != null && !initialMessageSent) {
+                        sendMessage(initialMessage)
+                        initialMessageSent = true
+                    }
+                } else {
+                    _isModelReady.value = false
                 }
+            }
         }
     }
 

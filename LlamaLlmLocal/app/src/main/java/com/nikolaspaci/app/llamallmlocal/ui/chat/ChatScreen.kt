@@ -19,6 +19,9 @@ import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatUiState
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 
+import com.nikolaspaci.app.llamallmlocal.ui.common.AppTopAppBar
+import com.nikolaspaci.app.llamallmlocal.ui.common.MessageInput
+import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
 import com.nikolaspaci.app.llamallmlocal.ui.settings.ModelSelectionDialog
 import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
 
@@ -27,13 +30,15 @@ import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
 fun ChatScreen(
     viewModel: ChatViewModel,
     settingsViewModel: SettingsViewModel,
-    onNavigateBack: () -> Unit
+    onOpenDrawer: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showMenu by remember { mutableStateOf(false) }
-    var showModelSelectionDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val conversation by viewModel.conversation.collectAsState()
+    var selectedModelPath by remember(conversation) {
+        mutableStateOf(conversation?.modelPath ?: "")
+    }
 
     if (showDeleteConfirmationDialog) {
         AlertDialog(
@@ -46,7 +51,6 @@ fun ChatScreen(
                         scope.launch {
                             viewModel.deleteConversation()
                             showDeleteConfirmationDialog = false
-                            onNavigateBack()
                         }
                     }
                 ) {
@@ -61,59 +65,32 @@ fun ChatScreen(
         )
     }
 
-    if (showModelSelectionDialog) {
-        ModelSelectionDialog(
-            viewModel = settingsViewModel,
-            onDismissRequest = { showModelSelectionDialog = false },
-            onModelSelected = { modelPath ->
-                viewModel.changeModel(modelPath)
-                showModelSelectionDialog = false
-            }
-        )
-    }
-
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
-            TopAppBar(
-                title = { Text("Chat") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Change Model") },
-                            onClick = {
-                                showModelSelectionDialog = true
-                                showMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete Chat") },
-                            onClick = {
-                                showDeleteConfirmationDialog = true
-                                showMenu = false
-                            }
-                        )
-                    }
-                }
+            AppTopAppBar(
+                title = "",
+                onOpenDrawer = onOpenDrawer
             )
         },
         bottomBar = {
-            val isModelReady by viewModel.isModelReady.collectAsState()
-            MessageInput(
-                onSendMessage = { viewModel.sendMessage(it) },
-                isEnabled = isModelReady
-            )
+            Column(modifier = Modifier.padding(8.dp)) {
+                ModelSelector(
+                    settingsViewModel = settingsViewModel,
+                    selectedModelPath = selectedModelPath,
+                    onModelSelected = {
+                        selectedModelPath = it
+                        viewModel.changeModel(it)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val isModelReady by viewModel.isModelReady.collectAsState()
+                MessageInput(
+                    onSendMessage = { viewModel.sendMessage(it) },
+                    isEnabled = isModelReady
+                )
+            }
         }
     ) { paddingValues ->
         when (val state = uiState) {
@@ -223,38 +200,6 @@ fun MessageRow(message: ChatMessage) {
                 text = message.message,
                 modifier = Modifier.padding(8.dp)
             )
-        }
-    }
-}
-
-@Composable
-fun MessageInput(onSendMessage: (String) -> Unit, isEnabled: Boolean) {
-    var text by remember { mutableStateOf("") }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier.weight(1f),
-            label = { Text("Type a message") },
-            enabled = isEnabled
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Button(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onSendMessage(text)
-                    text = ""
-                }
-            },
-            enabled = isEnabled && text.isNotBlank()
-        ) {
-            Text("Send")
         }
     }
 }

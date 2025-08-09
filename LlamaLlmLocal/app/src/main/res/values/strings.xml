@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">LlamaLlmLocal</string>
+    <string name="ask_your_question">Ask your question</string>
 </resources>
