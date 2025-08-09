@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,57 +54,51 @@ fun HistoryMenuItems(
         }
         is HistoryUiState.Success -> {
             if (state.conversations.isEmpty()) {
-                DropdownMenuItem(
-                    text = { Text("No conversations yet.") },
-                    onClick = { onCloseMenu() }
+                ListItem(
+                    headlineContent = { Text("No conversations yet.") }
                 )
             } else {
-                state.conversations.forEach { conversation ->
-                    val title = conversation.messages
-                        .firstOrNull { it.sender == Sender.USER }
-                        ?.let { "${it.message.take(25)}..." }
-                        ?: "Conversation #${conversation.conversation.id}"
+                LazyColumn {
+                    items(state.conversations) { conversation ->
+                        val title = conversation.messages
+                            .firstOrNull { it.sender == Sender.USER }
+                            ?.let { "'${it.message.take(25)}...'" }
+                            ?: "Conversation #${conversation.conversation.id}"
 
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = "Model: ${File(conversation.conversation.modelPath).name}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "Messages: ${conversation.messages.size}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        },
-                        onClick = {
-                            onConversationClick(conversation.conversation.id)
-                            onCloseMenu()
-                        },
-                        modifier = Modifier.combinedClickable(
-                            onClick = {
-                                onConversationClick(conversation.conversation.id)
-                                onCloseMenu()
+                        ListItem(
+                            headlineContent = { Text(title) },
+                            supportingContent = {
+                                Column {
+                                    Text(
+                                        text = "Model: ${File(conversation.conversation.modelPath).name}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = "Messages: ${conversation.messages.size}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
                             },
-                            onLongClick = {
-                                conversationToDelete = conversation
-                            }
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    onConversationClick(conversation.conversation.id)
+                                    onCloseMenu()
+                                },
+                                onLongClick = {
+                                    conversationToDelete = conversation
+                                }
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
         is HistoryUiState.Error -> {
-            DropdownMenuItem(
-                text = { Text(state.message, color = MaterialTheme.colorScheme.error) },
-                onClick = { onCloseMenu() }
+            ListItem(
+                headlineContent = { Text(state.message, color = MaterialTheme.colorScheme.error) }
             )
         }
     }
 }
+
