@@ -23,7 +23,7 @@ class LlamaJniService {
         return sessionPtr != 0L
     }
 
-    fun predict(prompt: String): Flow<String> = callbackFlow {
+    fun predict(prompt: String): Flow<PredictionEvent> = callbackFlow {
         if (sessionPtr == 0L) {
             close(IllegalStateException("Error: Model not loaded"))
             return@callbackFlow
@@ -31,10 +31,11 @@ class LlamaJniService {
 
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
-                trySend(token)
+                trySend(PredictionEvent.Token(token))
             }
 
-            override fun onComplete() {
+            override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
+                trySend(PredictionEvent.Completion(tokensPerSecond, durationInSeconds))
                 close()
             }
 
