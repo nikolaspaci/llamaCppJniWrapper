@@ -2,7 +2,7 @@ package com.nikolaspaci.app.llamallmlocal
 
 interface PredictCallback {
     fun onToken(token: String)
-    fun onComplete()
+    fun onComplete(tokensPerSecond: Double, durationInSeconds: Long)
     fun onError(error: String)
 }
 object LlamaApi {
