@@ -12,6 +12,31 @@
 #include "JNIMethods/FreeJni.hpp"
 
 // --- Mock JNI Environment ---
+#include <sstream>
+#include <string>
+#include <vector>
+
+// Structure pour simuler notre callback Kotlin/Java et capturer les résultats.
+struct MockCallback {
+    std::stringstream full_response;
+    bool completed = false;
+    bool error_occured = false;
+    std::string error_message;
+
+    // Cette fonction sera appelée par notre JNI mocké.
+    void onToken(const char* token) {
+        full_response << token;
+    }
+
+    void onComplete() {
+        completed = true;
+    }
+
+    void onError(const char* message) {
+        error_occured = true;
+        error_message = message;
+    }
+};
 
 // Helper functions to handle jstring in our test
 const char* mock_jstring_to_c_str(jstring str) {
@@ -84,28 +109,51 @@ int main(int argc, char **argv) {
     std::cout << "SUCCESS: init() test passed. Session pointer: " << session_ptr << std::endl;
 
     // 2. Test predict
-    const char* prompt_c_str = "Who is the current president of France?";
-    jstring prompt_jstr = mock_c_str_to_jstring(prompt_c_str);
+   const char* prompt_c_str = "Who is the current president of France?";
+jstring prompt_jstr = mock_c_str_to_jstring(prompt_c_str);
 
-    std::cout << "\nTesting predict() with prompt: \"" << prompt_c_str << "\"" << std::endl;
-    jstring result_jstr = Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(env, mock_this, session_ptr, prompt_jstr);
-    
-    if (result_jstr == nullptr) {
-        std::cerr << "TEST FAILED: predict() returned a null string." << std::endl;
-        Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_free(env, mock_this, session_ptr);
-        return 1;
-    }
+// 1. Créez une instance de votre callback de test.
+MockCallback mock_callback;
 
-    const char* result_c_str = mock_jstring_to_c_str(result_jstr);
-    std::string result_str(result_c_str);
-    
-    if (result_str.find("Erreur") != std::string::npos || result_str.empty()) {
-         std::cerr << "TEST FAILED: predict() returned an error or empty string: " << result_str << std::endl;
-         Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_free(env, mock_this, session_ptr);
-         return 1;
-    }
+// 2. Créez un jobject mock qui pointe vers notre callback.
+// La manière de faire cela dépend de votre framework de test.
+// Conceptuellement, c'est un pointeur vers notre instance.
+jobject mock_callback_obj = &mock_callback; 
 
-    std::cout << "SUCCESS: predict() test passed. Response: " << result_str << std::endl;
+std::cout << "\nTesting streaming predict() with prompt: \"" << prompt_c_str << "\"" << std::endl;
+
+// 3. Appelez la nouvelle fonction predict. Elle ne retourne rien (void).
+// Vous devrez adapter votre environnement de test pour que les appels JNI
+// (comme CallVoidMethod) appellent les fonctions de votre MockCallback.
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
+    env,
+    mock_this,
+    session_ptr,
+    prompt_jstr,
+    mock_callback_obj
+);
+
+// 4. Vérifiez l'état du callback APRÈS l'appel.
+if (mock_callback.error_occured) {
+    std::cerr << "TEST FAILED: predict() called onError with message: " << mock_callback.error_message << std::endl;
+    Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_free(env, mock_this, session_ptr);
+    return 1;
+}
+
+if (!mock_callback.completed) {
+    std::cerr << "TEST FAILED: predict() did not call onComplete." << std::endl;
+    Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_free(env, mock_this, session_ptr);
+    return 1;
+}
+
+std::string result_str = mock_callback.full_response.str();
+if (result_str.empty()) {
+    std::cerr << "TEST FAILED: The final response string is empty." << std::endl;
+    Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_free(env, mock_this, session_ptr);
+    return 1;
+}
+
+std::cout << "TEST PASSED. Full response received: " << result_str << std::endl;
 
     // 3. Test free
     std::cout << "\nTesting free()..." << std::endl;

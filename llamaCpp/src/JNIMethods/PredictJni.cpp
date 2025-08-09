@@ -9,11 +9,34 @@
 #include <vector>
 #include <sstream>
 #include <cstring>
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* this */, jlong session_ptr, jstring prompt_j) {
+extern "C" JNIEXPORT void JNICALL
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
+    JNIEnv *env,
+    jobject /* this */,
+    jlong session_ptr,
+    jstring prompt_j,
+    jobject callback_obj) {
+
+
+    // --- SETUP DU CALLBACK ---
+    jclass callback_class = env->GetObjectClass(callback_obj);
+    if (callback_class == nullptr) { return; }
+
+    jmethodID on_token_method   = env->GetMethodID(callback_class, "onToken",   "(Ljava/lang/String;)V");
+    jmethodID on_complete_method = env->GetMethodID(callback_class, "onComplete", "()V");
+    jmethodID on_error_method   = env->GetMethodID(callback_class, "onError",   "(Ljava/lang/String;)V");
+
+    // Vérifie que toutes les méthodes ont été trouvées
+    if (on_token_method == nullptr || on_complete_method == nullptr || on_error_method == nullptr) {
+        return;
+    }
+
     LlamaSession* session = reinterpret_cast<LlamaSession*>(session_ptr);
     if (!session) {
-        return env->NewStringUTF("Erreur: Session invalide.");
+        // Appelle le callback d'erreur
+        jstring error_msg = env->NewStringUTF("Erreur: La session Llama est invalide.");
+        env->CallVoidMethod(callback_obj, on_error_method, error_msg);
+        return;
     }
 
     const llama_model* model = session->model.get();
@@ -45,7 +68,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
     std::vector<llama_token> tokens = common_tokenize(vocab, formatted_prompt, true, true);
 
     if (tokens.empty()) {
-        return env->NewStringUTF("Erreur lors de la tokenisation.");
+        return env->CallVoidMethod(callback_obj, on_token_method, env->NewStringUTF("Erreur lors de la tokenisation."));
     }
 
     // config of batch processing
@@ -66,7 +89,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
         const int decodeId=llama_decode(context, batch);
         if (decodeId!= 0) {
             llama_batch_free(batch);
-            return env->NewStringUTF("Erreur lors de l'évaluation du prompt.");
+            env->CallVoidMethod(callback_obj, on_error_method, env->NewStringUTF("Erreur lors de l'évaluation du prompt."));
+            return;
         }
         processed_tokens += chunk_size;
     }
@@ -80,7 +104,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
     common_sampler *smpl = common_sampler_init(model, sparams);
     if (!smpl) {
         llama_batch_free(batch);
-        return env->NewStringUTF("Erreur d'initialisation du sampler.");
+        env->CallVoidMethod(callback_obj, on_error_method, env->NewStringUTF("Erreur d'initialisation du sampler."));
+        return;
     }
 
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -96,6 +121,14 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
 
         common_sampler_accept(smpl, new_token_id, true);
         std::string piece = common_token_to_piece(context, new_token_id, true);
+
+
+        if (!piece.empty()) {
+            jstring token_j = env->NewStringUTF(piece.c_str());
+            env->CallVoidMethod(callback_obj, on_token_method, token_j);
+            env->DeleteLocalRef(token_j);
+        }
+
         result_ss << piece;
 
         common_batch_clear(batch);
@@ -125,7 +158,9 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
     // std::cout << "Assistant response: " << result_str << std::endl;
     jstring result_jstr = env->NewStringUTF(result_str.c_str());
     if (result_jstr == nullptr) {
-        return env->NewStringUTF("Erreur lors de la création de la chaîne de résultat.");
+        env->CallVoidMethod(callback_obj, on_error_method, env->NewStringUTF("Erreur lors de la création de la chaîne de résultat."));
+        return;
     }
-    return result_jstr;
+    env->CallVoidMethod(callback_obj, on_complete_method);
+
 }
