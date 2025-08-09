@@ -3,6 +3,7 @@ package com.nikolaspaci.app.llamallmlocal.viewmodel
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
@@ -41,9 +42,20 @@ class SettingsViewModel(
 
     fun cacheModel(uri: Uri, onResult: (String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val fileName = "model_${System.currentTimeMillis()}.gguf"
-            val outputFile = File(context.cacheDir, fileName)
             try {
+                val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    cursor.moveToFirst()
+                    cursor.getString(nameIndex)
+                }
+
+                if (fileName == null) {
+                    // Could not determine file name
+                    withContext(Dispatchers.Main) { onResult(null) }
+                    return@launch
+                }
+
+                val outputFile = File(context.cacheDir, fileName)
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     FileOutputStream(outputFile).use { outputStream ->
                         inputStream.copyTo(outputStream)
