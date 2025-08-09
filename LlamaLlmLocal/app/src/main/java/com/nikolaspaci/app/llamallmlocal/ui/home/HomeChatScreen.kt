@@ -59,7 +59,7 @@ fun HomeChatScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Que recherchez-vous aujourd'hui ?",
+                text = "What are you looking for today?",
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
