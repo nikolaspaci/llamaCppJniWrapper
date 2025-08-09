@@ -20,7 +20,8 @@ import java.util.logging.Logger
 class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val llamaJniService: LlamaJniService,
-    private val conversationId: Long
+    private val conversationId: Long,
+    initialMessage: String?
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ChatUiState>(ChatUiState.Loading)
@@ -28,6 +29,8 @@ class ChatViewModel(
 
     private val _isModelReady = MutableStateFlow(false)
     val isModelReady: StateFlow<Boolean> = _isModelReady.asStateFlow()
+
+    private var initialMessageSent = false
 
     init {
         // Observe messages and update UI
@@ -60,6 +63,11 @@ class ChatViewModel(
                             llamaJniService.loadModel(modelPath)
                         }
                         _isModelReady.value = true
+                        // If there's an initial message, send it after the model is loaded.
+                        if (initialMessage != null && !initialMessageSent) {
+                            sendMessage(initialMessage)
+                            initialMessageSent = true
+                        }
                     } else {
                         _isModelReady.value = false
                     }

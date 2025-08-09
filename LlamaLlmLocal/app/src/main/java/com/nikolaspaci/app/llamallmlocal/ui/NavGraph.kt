@@ -20,16 +20,23 @@ import com.nikolaspaci.app.llamallmlocal.data.repository.ChatRepository
 import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
 import com.nikolaspaci.app.llamallmlocal.ui.chat.ChatScreen
 import com.nikolaspaci.app.llamallmlocal.ui.history.HistoryScreen
-import com.nikolaspaci.app.llamallmlocal.ui.settings.SettingsScreen
+import com.nikolaspaci.app.llamallmlocal.ui.home.HomeChatScreen
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModelFactory
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ViewModelFactory
 import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
+    object Home : Screen("home")
     object History : Screen("history")
-    object Settings : Screen("settings")
-    object Chat : Screen("chat/{conversationId}") {
-        fun createRoute(conversationId: Long) = "chat/$conversationId"
+    object Chat : Screen("chat/{conversationId}?initialMessage={initialMessage}") {
+        fun createRoute(conversationId: Long, initialMessage: String? = null): String {
+            val route = "chat/$conversationId"
+            return if (initialMessage != null) {
+                "$route?initialMessage=$initialMessage"
+            } else {
+                route
+            }
+        }
     }
 }
 
@@ -44,6 +51,14 @@ fun AppNavigation(factory: ViewModelFactory) {
         drawerContent = {
             ModalDrawerSheet {
                 NavigationDrawerItem(
+                    label = { Text("Home") },
+                    selected = navController.currentDestination?.route == Screen.Home.route,
+                    onClick = {
+                        navController.navigate(Screen.Home.route)
+                        scope.launch { drawerState.close() }
+                    }
+                )
+                NavigationDrawerItem(
                     label = { Text("History") },
                     selected = navController.currentDestination?.route == Screen.History.route,
                     onClick = {
@@ -51,41 +66,45 @@ fun AppNavigation(factory: ViewModelFactory) {
                         scope.launch { drawerState.close() }
                     }
                 )
-                NavigationDrawerItem(
-                    label = { Text("Settings") },
-                    selected = navController.currentDestination?.route == Screen.Settings.route,
-                    onClick = {
-                        navController.navigate(Screen.Settings.route)
-                        scope.launch { drawerState.close() }
-                    }
-                )
             }
         }
     ) {
-        NavHost(navController = navController, startDestination = Screen.History.route) {
-            composable(Screen.History.route) {
-                HistoryScreen(
-                    viewModel = viewModel(factory = factory),
+        NavHost(navController = navController, startDestination = Screen.Home.route) {
+            composable(Screen.Home.route) {
+                HomeChatScreen(
+                    homeViewModel = viewModel(factory = factory),
                     settingsViewModel = viewModel(factory = factory),
-                    onConversationClick = { conversationId ->
-                        navController.navigate(Screen.Chat.createRoute(conversationId))
-                    },
-                    onNewConversation = { newConversationId ->
-                        navController.navigate(Screen.Chat.createRoute(newConversationId))
+                    onStartChat = { conversationId, initialMessage ->
+                        navController.navigate(Screen.Chat.createRoute(conversationId, initialMessage))
                     },
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
                     }
                 )
             }
-            composable(Screen.Settings.route) {
-                SettingsScreen(viewModel = viewModel(factory = factory))
+            composable(Screen.History.route) {
+                HistoryScreen(
+                    viewModel = viewModel(factory = factory),
+                    onConversationClick = { conversationId ->
+                        navController.navigate(Screen.Chat.createRoute(conversationId))
+                    },
+                    onOpenDrawer = {
+                        scope.launch { drawerState.open() }
+                    }
+                )
             }
             composable(
                 route = Screen.Chat.route,
-                arguments = listOf(navArgument("conversationId") { type = NavType.LongType })
+                arguments = listOf(
+                    navArgument("conversationId") { type = NavType.LongType },
+                    navArgument("initialMessage") {
+                        type = NavType.StringType
+                        nullable = true
+                    }
+                )
             ) { backStackEntry ->
                 val conversationId = backStackEntry.arguments?.getLong("conversationId") ?: 0
+                val initialMessage = backStackEntry.arguments?.getString("initialMessage")
 
                 val context = LocalContext.current
                 val db = AppDatabase.getDatabase(context)
@@ -95,7 +114,8 @@ fun AppNavigation(factory: ViewModelFactory) {
                 val chatViewModelFactory = ChatViewModelFactory(
                     chatRepository,
                     llamaJniService,
-                    conversationId
+                    conversationId,
+                    initialMessage
                 )
 
                 ChatScreen(

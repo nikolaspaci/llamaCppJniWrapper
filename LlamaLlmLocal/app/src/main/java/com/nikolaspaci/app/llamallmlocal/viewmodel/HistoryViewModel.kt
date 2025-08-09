@@ -28,11 +28,6 @@ class HistoryViewModel(
         }
     }
 
-    suspend fun startNewConversation(modelPath: String): Long {
-        val conversation = Conversation(modelPath = modelPath)
-        return chatRepository.insertConversation(conversation)
-    }
-
     fun deleteConversation(conversation: ConversationWithMessages) {
         viewModelScope.launch {
             chatRepository.deleteConversation(conversation.conversation)

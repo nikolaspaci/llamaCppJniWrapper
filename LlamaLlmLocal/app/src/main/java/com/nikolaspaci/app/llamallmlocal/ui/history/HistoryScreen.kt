@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.data.database.ConversationWithMessages
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
+import com.nikolaspaci.app.llamallmlocal.ui.common.AppTopAppBar
 import com.nikolaspaci.app.llamallmlocal.ui.settings.ModelSelectionDialog
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryUiState
@@ -27,14 +28,11 @@ import java.io.File
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel,
-    settingsViewModel: SettingsViewModel,
     onConversationClick: (Long) -> Unit,
-    onNewConversation: (Long) -> Unit,
     onOpenDrawer: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
-    var showDialog by remember { mutableStateOf(false) }
     var conversationToDelete by remember { mutableStateOf<ConversationWithMessages?>(null) }
 
     if (conversationToDelete != null) {
@@ -54,38 +52,9 @@ fun HistoryScreen(
         )
     }
 
-    if (showDialog) {
-        ModelSelectionDialog(
-            viewModel = settingsViewModel,
-            onDismissRequest = { showDialog = false },
-            onModelSelected = { modelPath ->
-                showDialog = false
-                // Load the model into memory via the JNI
-                settingsViewModel.saveModelPath(modelPath)
-                // Create the conversation record in the database
-                scope.launch {
-                    val newConversationId = viewModel.startNewConversation(modelPath)
-                    onNewConversation(newConversationId)
-                }
-            }
-        )
-    }
-
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("History") },
-                navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showDialog = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "New Conversation")
-            }
+            AppTopAppBar(title = "History", onOpenDrawer = onOpenDrawer)
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
@@ -121,7 +90,7 @@ fun HistoryScreen(
 @Composable
 fun EmptyHistoryView() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("No conversations yet. Tap the + button to start a new one!")
+        Text("No conversations yet. Go to the Home screen to start a new one!")
     }
 }
 
