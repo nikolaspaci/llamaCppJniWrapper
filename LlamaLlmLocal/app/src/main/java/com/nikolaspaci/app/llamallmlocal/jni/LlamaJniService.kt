@@ -1,10 +1,12 @@
 package com.nikolaspaci.app.llamallmlocal.jni
 
 import com.nikolaspaci.app.llamallmlocal.LlamaApi
+import com.nikolaspaci.app.llamallmlocal.PredictCallback
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
 
 class LlamaJniService {
 
@@ -21,22 +23,34 @@ class LlamaJniService {
         return sessionPtr != 0L
     }
 
-    suspend fun predict(prompt: String): Flow<String> = withContext(Dispatchers.IO) {
+    fun predict(prompt: String): Flow<String> = callbackFlow {
         if (sessionPtr == 0L) {
-            return@withContext flow { emit("Error: Model not loaded") }
+            close(IllegalStateException("Error: Model not loaded"))
+            return@callbackFlow
         }
 
-        // The native function is blocking and returns the full response.
-        // We'll run it in a background thread.
-        // For now, we'll keep it synchronous within this suspend function,
-        // as the native call itself is blocking.
-        // To make it truly asynchronous and stream results, the native code
-        // would need to support callbacks or a similar mechanism.
-        val fullResponse = LlamaApi.predict(sessionPtr, prompt)
+        val callback = object : PredictCallback {
+            override fun onToken(token: String) {
+                trySend(token)
+            }
 
-        //return full response
-        flow { emit(fullResponse) }
-    }
+            override fun onComplete() {
+                close()
+            }
+
+            override fun onError(error: String) {
+                close(RuntimeException(error))
+            }
+        }
+
+        // This call is blocking on the current thread until the native side calls onComplete or onError
+        LlamaApi.predict(sessionPtr, prompt, callback)
+
+        // awaitClose is needed to keep the flow open until close() is called
+        awaitClose {
+            // You can add cleanup logic here if needed
+        }
+    }.flowOn(Dispatchers.IO)
 
     fun unloadModel() {
         if (sessionPtr != 0L) {
