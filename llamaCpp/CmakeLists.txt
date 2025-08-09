@@ -57,6 +57,8 @@ if(ANDROID)
                 -DLLAMA_VULKAN=1
             "-march=armv9-a+sve2+sme2+bf16+sve2+dotprod+fp16fml+i8mm"
             -O3
+            -DNDEBUG
+            #-Og
             -ffunction-sections -fdata-sections
             -fno-exceptions -fno-rtti
             -fvisibility=hidden

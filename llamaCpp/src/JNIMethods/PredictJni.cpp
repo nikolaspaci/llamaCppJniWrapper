@@ -63,8 +63,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(JNIEnv *env, jobject /* 
             const bool need_logits = (token_idx == n_tokens - 1);
             common_batch_add(batch, tokens[token_idx], token_idx, {0}, need_logits);
         }
-
-        if (llama_decode(context, batch) != 0) {
+        const int decodeId=llama_decode(context, batch);
+        if (decodeId!= 0) {
             llama_batch_free(batch);
             return env->NewStringUTF("Erreur lors de l'évaluation du prompt.");
         }
