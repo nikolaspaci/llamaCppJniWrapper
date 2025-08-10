@@ -36,45 +36,80 @@ set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common utils library" FORCE)
 
 add_subdirectory(extern/llama.cpp llama_cpp_build)
 
-add_library(jniLlamaCppWrapper SHARED ${SOURCE_FILES_LIST})
+# Function to create a specific version of the JNI library for Android
+function(create_android_jni_library target_name arch_name march_flags) 
+    add_library(${target_name} SHARED ${SOURCE_FILES_LIST})
 
-target_include_directories(jniLlamaCppWrapper
-    PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${JNI_INCLUDE_DIRS}
-    ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
-    ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
-)
+    target_include_directories(${target_name} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${JNI_INCLUDE_DIRS}
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
+    )
+
+    target_compile_options(${target_name} PRIVATE
+        -DGGML_USE_CPU
+        -DGGML_USE_CPU_AARCH64
+        -DGGML_CPU_ARM_ARCH=${arch_name}
+        -DGGML_F16C=ON
+        -DGGML_FMA=ON
+        -DLLAMA_VULKAN=1
+        ${march_flags}
+        -O3
+        -DNDEBUG
+        -ffunction-sections -fdata-sections
+        -fno-exceptions -fno-rtti
+        -fvisibility=hidden
+    )
+
+    set_target_properties(${target_name} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs/${ANDROID_ABI}"
+        OUTPUT_NAME "jniLlamaCppWrapper_${arch_name}"
+    )
+
+    target_link_libraries(${target_name} PRIVATE llama common)
+endfunction() 
+
 
 if(ANDROID)
     if (${ANDROID_ABI} STREQUAL "arm64-v8a")
-        target_compile_options(jniLlamaCppWrapper PRIVATE
-            -DGGML_USE_CPU 
-            -DGGML_USE_CPU_AARCH64
-            -DGGML_CPU_ARM_ARCH=armv9-a
-            -DGGML_F16C=ON
-            -DGGML_FMA=ON
-                -DLLAMA_VULKAN=1
+        # Build for armv9-a
+        create_android_jni_library(
+            jniLlamaCppWrapper_v9a
+            "armv9-a"
             "-march=armv9-a+sve2+sme2+bf16+sve2+dotprod+fp16fml+i8mm"
-            -O3
-            -DNDEBUG
-            #-Og
-            -ffunction-sections -fdata-sections
-            -fno-exceptions -fno-rtti
-            -fvisibility=hidden
         )
+        # Build for armv8.2-a
+        create_android_jni_library(
+            jniLlamaCppWrapper_v82a
+            "armv8.2-a"
+            "-march=armv8.2-a+fp16+dotprod"
+        )
+    else()
+        # Fallback for other Android architectures (e.g., x86_64, armeabi-v7a)
+        # Create a generic library without specific march flags
+        add_library(jniLlamaCppWrapper SHARED ${SOURCE_FILES_LIST})
+        target_include_directories(jniLlamaCppWrapper PRIVATE ${PROJECT_SOURCE_DIR}/include ${JNI_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common)
+        set_target_properties(jniLlamaCppWrapper PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs/${ANDROID_ABI}")
+        target_link_libraries(jniLlamaCppWrapper PRIVATE llama common)
     endif()
 else()
+    # Non-Android build
+    add_library(jniLlamaCppWrapper SHARED ${SOURCE_FILES_LIST})
+    target_include_directories(jniLlamaCppWrapper PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${JNI_INCLUDE_DIRS}
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
+    )
     target_compile_options(jniLlamaCppWrapper PRIVATE -march=native -O3)
     find_package(JNI REQUIRED)
+    set_target_properties(jniLlamaCppWrapper PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs"
+    )
+    target_link_libraries(jniLlamaCppWrapper PRIVATE llama common)
 endif()
 
-set_target_properties(jniLlamaCppWrapper
-    PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs"
-)
-
-target_link_libraries(jniLlamaCppWrapper PRIVATE llama common)
 
 # Test executable (inchangé)
 if(NOT ANDROID)
