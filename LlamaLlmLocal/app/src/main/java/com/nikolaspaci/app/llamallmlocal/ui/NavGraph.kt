@@ -34,14 +34,9 @@ import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
-    object Chat : Screen("chat/{conversationId}?initialMessage={initialMessage}") {
-        fun createRoute(conversationId: Long, initialMessage: String? = null): String {
-            val route = "chat/$conversationId"
-            return if (initialMessage != null) {
-                "$route?initialMessage=$initialMessage"
-            } else {
-                route
-            }
+    object Chat : Screen("chat/{conversationId}") {
+        fun createRoute(conversationId: Long): String {
+            return "chat/$conversationId"
         }
     }
 }
@@ -91,8 +86,8 @@ fun AppNavigation(factory: ViewModelFactory) {
                 HomeChatScreen(
                     homeViewModel = viewModel(factory = factory),
                     settingsViewModel = viewModel(factory = factory),
-                    onStartChat = { conversationId, initialMessage ->
-                        navController.navigate(Screen.Chat.createRoute(conversationId, initialMessage))
+                    onStartChat = { conversationId ->
+                        navController.navigate(Screen.Chat.createRoute(conversationId))
                     },
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
@@ -102,15 +97,10 @@ fun AppNavigation(factory: ViewModelFactory) {
             composable(
                 route = Screen.Chat.route,
                 arguments = listOf(
-                    navArgument("conversationId") { type = NavType.LongType },
-                    navArgument("initialMessage") {
-                        type = NavType.StringType
-                        nullable = true
-                    }
+                    navArgument("conversationId") { type = NavType.LongType }
                 )
             ) { backStackEntry ->
                 val conversationId = backStackEntry.arguments?.getLong("conversationId") ?: 0
-                val initialMessage = backStackEntry.arguments?.getString("initialMessage")
 
                 val context = LocalContext.current
                 val db = AppDatabase.getDatabase(context)
@@ -120,8 +110,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                 val chatViewModelFactory = ChatViewModelFactory(
                     chatRepository,
                     llamaJniService,
-                    conversationId,
-                    initialMessage
+                    conversationId
                 )
 
                 ChatScreen(

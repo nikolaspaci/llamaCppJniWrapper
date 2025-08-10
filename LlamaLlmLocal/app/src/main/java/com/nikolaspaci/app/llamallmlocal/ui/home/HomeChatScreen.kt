@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 fun HomeChatScreen(
     homeViewModel: HomeViewModel,
     settingsViewModel: SettingsViewModel,
-    onStartChat: (Long, String) -> Unit,
+    onStartChat: (Long) -> Unit,
     onOpenDrawer: () -> Unit
 ) {
     var selectedModelPath by remember { mutableStateOf(settingsViewModel.getModelPath() ?: "") }
@@ -69,8 +69,8 @@ fun HomeChatScreen(
                 onSendMessage = { userInput ->
                     if (selectedModelPath.isNotEmpty()) {
                         scope.launch {
-                            val newConversationId = homeViewModel.startNewConversation(selectedModelPath)
-                            onStartChat(newConversationId, userInput)
+                            val newConversationId = homeViewModel.startNewConversation(selectedModelPath, userInput)
+                            onStartChat(newConversationId)
                         }
                     }
                 },

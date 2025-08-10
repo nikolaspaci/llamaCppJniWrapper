@@ -24,8 +24,7 @@ data class Stats(val tokensPerSecond: Double, val durationInSeconds: Long)
 class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val llamaJniService: LlamaJniService,
-    private val conversationId: Long,
-    initialMessage: String?
+    private val conversationId: Long
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ChatUiState>(ChatUiState.Loading)
@@ -37,7 +36,7 @@ class ChatViewModel(
     private val _conversation = MutableStateFlow<Conversation?>(null)
     val conversation: StateFlow<Conversation?> = _conversation.asStateFlow()
 
-    private var initialMessageSent = false
+    private var initialPredictionStarted = false
 
     init {
         // Observe messages and update UI
@@ -56,11 +55,18 @@ class ChatViewModel(
                     } else {
                         null
                     }
+                    val messages = conversationWithMessages.messages
                     _uiState.value = ChatUiState.Success(
-                        messages = conversationWithMessages.messages,
+                        messages = messages,
                         streamingMessage = streamingMessage,
                         lastMessageStats = lastMessageStats
                     )
+
+                    // Trigger initial prediction if needed
+                    if (_isModelReady.value && !initialPredictionStarted && messages.size == 1 && messages.first().sender == Sender.USER) {
+                        initialPredictionStarted = true
+                        runPrediction(messages.first().message)
+                    }
                 }
             }
         }
@@ -74,10 +80,12 @@ class ChatViewModel(
                         llamaJniService.loadModel(modelPath)
                     }
                     _isModelReady.value = true
-                    // If there's an initial message, send it after the model is loaded.
-                    if (initialMessage != null && !initialMessageSent) {
-                        sendMessage(initialMessage)
-                        initialMessageSent = true
+
+                    // After model is ready, check if we need to run initial prediction
+                    val currentState = _uiState.value
+                    if (currentState is ChatUiState.Success && !initialPredictionStarted && currentState.messages.size == 1 && currentState.messages.first().sender == Sender.USER) {
+                        initialPredictionStarted = true
+                        runPrediction(currentState.messages.first().message)
                     }
                 } else {
                     _isModelReady.value = false
@@ -94,13 +102,18 @@ class ChatViewModel(
         )
         viewModelScope.launch {
             chatRepository.addMessageToConversation(userMessage)
+            runPrediction(text)
+        }
+    }
 
+    private fun runPrediction(prompt: String) {
+        viewModelScope.launch {
             // Clear old stats and show loading indicator
             (_uiState.value as? ChatUiState.Success)?.let {
                 _uiState.value = it.copy(streamingMessage = "", lastMessageStats = null)
             }
 
-            val botMessageFlow = llamaJniService.predict(text)
+            val botMessageFlow = llamaJniService.predict(prompt)
             var accumulatedResponse = ""
             var finalStats: Stats? = null
 
