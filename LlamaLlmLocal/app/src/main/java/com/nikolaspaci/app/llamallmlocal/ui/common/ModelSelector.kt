@@ -6,10 +6,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -19,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
 import java.io.File
 
@@ -51,12 +55,19 @@ fun ModelSelector(
 
     Box(modifier = modifier.wrapContentSize(Alignment.TopStart)) {
         Button(onClick = { expanded = true }, enabled = !isLoading) {
-            val buttonText = if (selectedModelPath.isNotEmpty()) {
-                File(selectedModelPath).name
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
             } else {
-                "Select a Model"
+                val buttonText = if (selectedModelPath.isNotEmpty()) {
+                    File(selectedModelPath).name
+                } else {
+                    "Select a Model"
+                }
+                Text(buttonText)
             }
-            Text(buttonText)
         }
         DropdownMenu(
             expanded = expanded,
