@@ -8,13 +8,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.nikolaspaci.app.llamallmlocal.ui.AppNavigation
 import com.nikolaspaci.app.llamallmlocal.ui.theme.LlamaLLmLocalTheme
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ViewModelFactory
  
+import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) {
+                LlamaJniService.unloadModel()
+            }
+        })
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             LlamaLLmLocalTheme {

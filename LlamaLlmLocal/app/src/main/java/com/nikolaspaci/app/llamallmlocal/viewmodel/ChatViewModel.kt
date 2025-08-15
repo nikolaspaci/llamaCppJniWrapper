@@ -78,6 +78,11 @@ class ChatViewModel(
                     _isModelReady.value = false
                     withContext(Dispatchers.IO) {
                         llamaJniService.loadModel(modelPath)
+                        (_uiState.value as? ChatUiState.Success)?.let {
+                            if (it.messages.isNotEmpty()) {
+                                llamaJniService.restoreHistory(it.messages.toTypedArray())
+                            }
+                        }
                     }
                     _isModelReady.value = true
 

@@ -13,7 +13,6 @@ class ViewModelFactory(private val context: Context) : ViewModelProvider.Factory
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         val db = AppDatabase.getDatabase(context)
         val chatRepository = ChatRepository(db.chatDao())
-        val llamaJniService = LlamaJniService()
         val sharedPreferences = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
 
 
@@ -22,7 +21,7 @@ class ViewModelFactory(private val context: Context) : ViewModelProvider.Factory
                 HistoryViewModel(chatRepository, sharedPreferences) as T
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(context, sharedPreferences, llamaJniService) as T
+                SettingsViewModel(context, sharedPreferences, LlamaJniService) as T
             }
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
                 HomeViewModel(chatRepository) as T

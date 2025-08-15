@@ -105,11 +105,9 @@ fun AppNavigation(factory: ViewModelFactory) {
                 val context = LocalContext.current
                 val db = AppDatabase.getDatabase(context)
                 val chatRepository = ChatRepository(db.chatDao())
-                val llamaJniService = LlamaJniService()
 
                 val chatViewModelFactory = ChatViewModelFactory(
                     chatRepository,
-                    llamaJniService,
                     conversationId
                 )
 

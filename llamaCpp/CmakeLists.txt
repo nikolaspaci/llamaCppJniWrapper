@@ -13,6 +13,7 @@ set(SOURCE_FILES_LIST
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/InitJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/PredictJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/FreeJni.cpp
+    ${PROJECT_SOURCE_DIR}/src/JNIMethods/RestoreHistoryJni.cpp
 )
 
 if(ANDROID)
