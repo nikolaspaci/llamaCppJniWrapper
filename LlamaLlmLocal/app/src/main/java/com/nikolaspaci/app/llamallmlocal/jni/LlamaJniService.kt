@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 
-class LlamaJniService {
+object LlamaJniService {
 
     private var sessionPtr: Long = 0
 
@@ -57,6 +57,12 @@ class LlamaJniService {
         if (sessionPtr != 0L) {
             LlamaApi.free(sessionPtr)
             sessionPtr = 0
+        }
+    }
+
+    fun restoreHistory(messages: Array<Any>) {
+        if (sessionPtr != 0L) {
+            LlamaApi.restoreHistory(sessionPtr, messages)
         }
     }
 }

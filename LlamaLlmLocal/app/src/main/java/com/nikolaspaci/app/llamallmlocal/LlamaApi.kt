@@ -30,5 +30,6 @@ object LlamaApi {
     external fun init(modelPath: String): Long
     external fun free(sessionPtr: Long)
     external fun predict(sessionPtr: Long, prompt: String, callback: PredictCallback)
+    external fun restoreHistory(sessionPtr: Long, messages: Array<Any>)
 
 }

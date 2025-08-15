@@ -7,14 +7,13 @@ import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
 
 class ChatViewModelFactory(
     private val chatRepository: ChatRepository,
-    private val llamaJniService: LlamaJniService,
     private val conversationId: Long
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ChatViewModel(chatRepository, llamaJniService, conversationId) as T
+            return ChatViewModel(chatRepository, LlamaJniService, conversationId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
