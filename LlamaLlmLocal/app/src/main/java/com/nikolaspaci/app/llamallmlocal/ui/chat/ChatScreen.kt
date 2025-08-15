@@ -27,13 +27,13 @@ import com.nikolaspaci.app.llamallmlocal.ui.common.MessageInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
-import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
-    settingsViewModel: SettingsViewModel,
+    modelFileViewModel: ModelFileViewModel,
     onOpenDrawer: () -> Unit,
     onNavigateToSettings: (String) -> Unit
 ) {
@@ -58,7 +58,7 @@ fun ChatScreen(
         bottomBar = {
             Column(modifier = Modifier.padding(8.dp)) {
                 ModelSelector(
-                    settingsViewModel = settingsViewModel,
+                    modelFileViewModel = modelFileViewModel,
                     selectedModelPath = selectedModelPath,
                     onModelSelected = {
                         selectedModelPath = it

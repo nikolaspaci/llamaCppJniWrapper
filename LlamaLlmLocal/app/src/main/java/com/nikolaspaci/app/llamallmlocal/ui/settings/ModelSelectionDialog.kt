@@ -13,12 +13,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import java.io.File
 
 @Composable
 fun ModelSelectionDialog(
-    viewModel: SettingsViewModel,
+    viewModel: ModelFileViewModel,
     onDismissRequest: () -> Unit,
     onModelSelected: (String) -> Unit
 ) {

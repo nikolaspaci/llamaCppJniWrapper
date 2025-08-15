@@ -28,18 +28,18 @@ import com.nikolaspaci.app.llamallmlocal.ui.common.AppTopAppBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.MessageInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HomeViewModel
-import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeChatScreen(
     homeViewModel: HomeViewModel,
-    settingsViewModel: SettingsViewModel,
+    modelFileViewModel: ModelFileViewModel,
     onStartChat: (Long) -> Unit,
     onOpenDrawer: () -> Unit
 ) {
-    var selectedModelPath by remember { mutableStateOf(settingsViewModel.getModelPath() ?: "") }
+    var selectedModelPath by remember { mutableStateOf(modelFileViewModel.getModelPath() ?: "") }
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -78,11 +78,11 @@ fun HomeChatScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             ModelSelector(
-                settingsViewModel = settingsViewModel,
+                modelFileViewModel = modelFileViewModel,
                 selectedModelPath = selectedModelPath,
                 onModelSelected = {
                     selectedModelPath = it
-                    settingsViewModel.saveModelPath(it)
+                    modelFileViewModel.saveModelPath(it,  ModelParameter(modelId = it))
                 },
                 modifier = Modifier.fillMaxWidth()
             )

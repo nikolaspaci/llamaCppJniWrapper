@@ -23,12 +23,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.data.database.AppDatabase
 import com.nikolaspaci.app.llamallmlocal.data.repository.ChatRepository
+import com.nikolaspaci.app.llamallmlocal.data.repository.ModelParameterRepository
 import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
 import com.nikolaspaci.app.llamallmlocal.ui.chat.ChatScreen
 import com.nikolaspaci.app.llamallmlocal.ui.common.HistoryMenuItems
 import com.nikolaspaci.app.llamallmlocal.ui.home.HomeChatScreen
+import com.nikolaspaci.app.llamallmlocal.ui.settings.SettingsScreen
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModelFactory
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModelFactory
+import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModelFactory
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ViewModelFactory
 import kotlinx.coroutines.launch
 
@@ -52,6 +57,13 @@ fun AppNavigation(factory: ViewModelFactory) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val historyViewModel: HistoryViewModel = viewModel(factory = factory)
+    val modelFileViewModel: ModelFileViewModel = viewModel(
+        factory = ModelFileViewModelFactory(
+            LocalContext.current,
+            LocalContext.current.getSharedPreferences("app_prefs", 0),
+            LlamaJniService
+        )
+    )
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -90,7 +102,7 @@ fun AppNavigation(factory: ViewModelFactory) {
             composable(Screen.Home.route) {
                 HomeChatScreen(
                     homeViewModel = viewModel(factory = factory),
-                    settingsViewModel = viewModel(factory = factory),
+                    modelFileViewModel = modelFileViewModel,
                     onStartChat = { conversationId ->
                         navController.navigate(Screen.Chat.createRoute(conversationId))
                     },
@@ -118,7 +130,7 @@ fun AppNavigation(factory: ViewModelFactory) {
 
                 ChatScreen(
                     viewModel = viewModel(factory = chatViewModelFactory),
-                    settingsViewModel = viewModel(factory = factory),
+                    modelFileViewModel = modelFileViewModel,
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
                     },

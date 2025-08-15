@@ -20,9 +20,6 @@ class ViewModelFactory(private val context: Context) : ViewModelProvider.Factory
             modelClass.isAssignableFrom(HistoryViewModel::class.java) -> {
                 HistoryViewModel(chatRepository, sharedPreferences) as T
             }
-            modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(context, sharedPreferences, LlamaJniService) as T
-            }
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
                 HomeViewModel(chatRepository) as T
             }

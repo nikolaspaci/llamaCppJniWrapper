@@ -23,18 +23,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import java.io.File
 
 @Composable
 fun ModelSelector(
-    settingsViewModel: SettingsViewModel,
+    modelFileViewModel: ModelFileViewModel,
     selectedModelPath: String,
     onModelSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val cachedModels by settingsViewModel.cachedModels.collectAsState()
+    val cachedModels by modelFileViewModel.cachedModels.collectAsState()
     var isLoading by remember { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -43,7 +43,7 @@ fun ModelSelector(
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
                 isLoading = true
-                settingsViewModel.cacheModel(uri) { newPath ->
+                modelFileViewModel.cacheModel(uri) { newPath ->
                     isLoading = false
                     if (newPath != null) {
                         onModelSelected(newPath)
