@@ -34,7 +34,8 @@ import com.nikolaspaci.app.llamallmlocal.viewmodel.SettingsViewModel
 fun ChatScreen(
     viewModel: ChatViewModel,
     settingsViewModel: SettingsViewModel,
-    onOpenDrawer: () -> Unit
+    onOpenDrawer: () -> Unit,
+    onNavigateToSettings: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val conversation by viewModel.conversation.collectAsState()
@@ -48,7 +49,10 @@ fun ChatScreen(
         topBar = {
             AppTopAppBar(
                 title = "",
-                onOpenDrawer = onOpenDrawer
+                onOpenDrawer = onOpenDrawer,
+                onNavigateToSettings = {
+                    onNavigateToSettings(selectedModelPath)
+                }
             )
         },
         bottomBar = {

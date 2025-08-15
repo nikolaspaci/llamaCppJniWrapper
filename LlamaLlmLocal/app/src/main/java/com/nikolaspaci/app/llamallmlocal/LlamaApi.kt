@@ -1,6 +1,7 @@
 package com.nikolaspaci.app.llamallmlocal
 
 import android.os.Build
+import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
 
 interface PredictCallback {
     fun onToken(token: String)
@@ -27,9 +28,9 @@ object LlamaApi {
         }
     }
 
-    external fun init(modelPath: String): Long
+    external fun init(modelPath: String, modelParameters: ModelParameter): Long
     external fun free(sessionPtr: Long)
-    external fun predict(sessionPtr: Long, prompt: String, callback: PredictCallback)
+    external fun predict(sessionPtr: Long, prompt: String, modelParameters: ModelParameter, callback: PredictCallback)
     external fun restoreHistory(sessionPtr: Long, messages: Array<Any>)
 
 }

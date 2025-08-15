@@ -39,6 +39,11 @@ sealed class Screen(val route: String) {
             return "chat/$conversationId"
         }
     }
+    object Settings : Screen("settings/{modelId}") {
+        fun createRoute(modelId: String): String {
+            return "settings/$modelId"
+        }
+    }
 }
 
 @Composable
@@ -116,7 +121,26 @@ fun AppNavigation(factory: ViewModelFactory) {
                     settingsViewModel = viewModel(factory = factory),
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
+                    },
+                    onNavigateToSettings = { modelId ->
+                        navController.navigate(Screen.Settings.createRoute(modelId))
                     }
+                )
+            }
+            composable(
+                route = Screen.Settings.route,
+                arguments = listOf(
+                    navArgument("modelId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val modelId = backStackEntry.arguments?.getString("modelId") ?: ""
+                val context = LocalContext.current
+                val db = AppDatabase.getDatabase(context)
+                val modelParameterRepository = ModelParameterRepository(db.modelParameterDao())
+                val settingsViewModelFactory = SettingsViewModelFactory(modelParameterRepository, modelId)
+                SettingsScreen(
+                    navController = navController,
+                    viewModel = viewModel(factory = settingsViewModelFactory)
                 )
             }
         }

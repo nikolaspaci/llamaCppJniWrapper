@@ -1,10 +1,26 @@
 #include "JNIMethods/InitJni.hpp"
 #include "session/LlamaSession.hpp"
 #include "llama-cpp.h"
+
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(JNIEnv *env, jobject /* this */, jstring modelPath) {
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(JNIEnv *env, jobject /* this */, jstring modelPath, jobject modelParameters) {
     // Initialise the llama backend.
     llama_backend_init();
+
+    // Find the ModelParameter class and its fields
+    jclass modelParamsClass = env->FindClass("com/nikolaspaci/app/llamallmlocal/data/database/ModelParameter");
+    jfieldID temperatureField = env->GetFieldID(modelParamsClass, "temperature", "F");
+    jfieldID topKField = env->GetFieldID(modelParamsClass, "topK", "I");
+    jfieldID topPField = env->GetFieldID(modelParamsClass, "topP", "F");
+    jfieldID minPField = env->GetFieldID(modelParamsClass, "minP", "F");
+
+    // Get the values from the modelParameters object
+    jfloat temperature = env->GetFloatField(modelParameters, temperatureField);
+    jint topK = env->GetIntField(modelParameters, topKField);
+    jfloat topP = env->GetFloatField(modelParameters, topPField);
+    jfloat minP = env->GetFloatField(modelParameters, minPField);
+
+
     // Prepare the parameters for the model and context.
     llama_model_params model_params = llama_model_default_params();
     model_params.use_mmap = true; // Use memory-mapped files for model loading.
@@ -18,6 +34,11 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(JNIEnv *env, jobject /* thi
 
     // Create a session on the heap
     auto* session = new LlamaSession();
+    session->sparams.temp = temperature;
+    session->sparams.top_k = topK;
+    session->sparams.top_p = topP;
+    session->sparams.min_p = minP;
+
 
     // Load the model and assign the raw pointer to the unique_ptr
     const char *path = env->GetStringUTFChars(modelPath, 0);

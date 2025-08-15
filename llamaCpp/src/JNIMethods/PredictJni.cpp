@@ -15,6 +15,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     jobject /* this */,
     jlong session_ptr,
     jstring prompt_j,
+    jobject modelParameters,
     jobject callback_obj) {
 
 
@@ -38,6 +39,25 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
         env->CallVoidMethod(callback_obj, on_error_method, error_msg);
         return;
     }
+
+    // Find the ModelParameter class and its fields
+    jclass modelParamsClass = env->FindClass("com/nikolaspaci/app/llamallmlocal/data/database/ModelParameter");
+    jfieldID temperatureField = env->GetFieldID(modelParamsClass, "temperature", "F");
+    jfieldID topKField = env->GetFieldID(modelParamsClass, "topK", "I");
+    jfieldID topPField = env->GetFieldID(modelParamsClass, "topP", "F");
+    jfieldID minPField = env->GetFieldID(modelParamsClass, "minP", "F");
+
+    // Get the values from the modelParameters object
+    jfloat temperature = env->GetFloatField(modelParameters, temperatureField);
+    jint topK = env->GetIntField(modelParameters, topKField);
+    jfloat topP = env->GetFloatField(modelParameters, topPField);
+    jfloat minP = env->GetFloatField(modelParameters, minPField);
+
+    // Update the session parameters
+    session->sparams.temp = temperature;
+    session->sparams.top_k = topK;
+    session->sparams.top_p = topP;
+    session->sparams.min_p = minP;
 
     const llama_model* model = session->model.get();
     llama_context* context = session->context.get();
@@ -100,8 +120,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     const int max_new_tokens = 256;
     int n_cur = n_tokens;
 
-    struct common_params_sampling sparams = {};
-    common_sampler *smpl = common_sampler_init(model, sparams);
+    common_sampler *smpl = common_sampler_init(model, session->sparams);
     if (!smpl) {
         llama_batch_free(batch);
         env->CallVoidMethod(callback_obj, on_error_method, env->NewStringUTF("Erreur d'initialisation du sampler."));

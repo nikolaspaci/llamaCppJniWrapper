@@ -1,86 +1,52 @@
 package com.nikolaspaci.app.llamallmlocal.viewmodel
 
-import android.content.Context
-import android.content.SharedPreferences
-import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.nikolaspaci.app.llamallmlocal.jni.LlamaJniService
-import kotlinx.coroutines.Dispatchers
+import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
+import com.nikolaspaci.app.llamallmlocal.data.repository.ModelParameterRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-
-const val MODEL_PATH_KEY = "model_path"
 
 class SettingsViewModel(
-    private val context: Context,
-    private val sharedPreferences: SharedPreferences,
-    private val llamaJniService: LlamaJniService
+    private val repository: ModelParameterRepository,
+    private val modelId: String
 ) : ViewModel() {
 
-    private val _cachedModels = MutableStateFlow<List<File>>(emptyList())
-    val cachedModels: StateFlow<List<File>> = _cachedModels.asStateFlow()
+    private val _modelParameter = MutableStateFlow<ModelParameter?>(null)
+    val modelParameter = _modelParameter.asStateFlow()
 
     init {
-        loadCachedModels()
-    }
-
-    fun loadCachedModels() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val files = context.cacheDir.listFiles()
-                ?.filter { it.isFile && it.name.endsWith(".gguf", ignoreCase = true) }
-                ?: emptyList()
-            _cachedModels.value = files
+        viewModelScope.launch {
+            _modelParameter.value = repository.getModelParameter(modelId) ?: ModelParameter(modelId)
         }
     }
 
-    fun cacheModel(uri: Uri, onResult: (String?) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    cursor.moveToFirst()
-                    cursor.getString(nameIndex)
-                }
-
-                if (fileName == null) {
-                    // Could not determine file name
-                    withContext(Dispatchers.Main) { onResult(null) }
-                    return@launch
-                }
-
-                val outputFile = File(context.cacheDir, fileName)
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    FileOutputStream(outputFile).use { outputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-                }
-                // Reload the list of cached models
-                loadCachedModels()
-                withContext(Dispatchers.Main) {
-                    onResult(outputFile.absolutePath)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                withContext(Dispatchers.Main) {
-                    onResult(null)
-                }
-            }
+    fun updateAndSave(temperature: Float, topK: Int, topP: Float, minP: Float) {
+        val newParams = ModelParameter(
+            modelId = modelId,
+            temperature = temperature,
+            topK = topK,
+            topP = topP,
+            minP = minP
+        )
+        _modelParameter.value = newParams
+        viewModelScope.launch {
+            repository.insert(newParams)
         }
     }
+}
 
-    fun saveModelPath(path: String) {
-        sharedPreferences.edit().putString(MODEL_PATH_KEY, path).apply()
-        llamaJniService.loadModel(path)
-    }
-
-    fun getModelPath(): String? {
-        return sharedPreferences.getString(MODEL_PATH_KEY, null)
+class SettingsViewModelFactory(
+    private val repository: ModelParameterRepository,
+    private val modelId: String
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return SettingsViewModel(repository, modelId) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
