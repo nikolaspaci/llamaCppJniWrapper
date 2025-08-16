@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.arnyminerz.markdowntext.MarkdownText
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats
@@ -32,8 +33,8 @@ fun MessageRow(message: ChatMessage, stats: Stats? = null) {
             )
         ) {
             Column(modifier = Modifier.padding(8.dp)) {
-                Text(
-                    text = message.message
+                MarkdownText(
+                    markdown = message.message
                 )
                 if (stats != null) {
                     Spacer(modifier = Modifier.height(4.dp))

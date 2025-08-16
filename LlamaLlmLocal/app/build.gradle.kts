@@ -93,4 +93,6 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     kapt(libs.androidx.room.compiler)
 
+    // Markdown
+    implementation("com.arnyminerz.markdowntext:markdowntext:1.0.0")
 }
