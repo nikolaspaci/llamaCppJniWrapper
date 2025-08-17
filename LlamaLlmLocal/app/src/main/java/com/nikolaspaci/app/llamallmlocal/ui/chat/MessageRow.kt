@@ -14,7 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.arnyminerz.markdowntext.MarkdownText
+import com.colintheshots.twain.MarkdownText
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats

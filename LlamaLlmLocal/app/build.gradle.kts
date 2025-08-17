@@ -94,5 +94,5 @@ dependencies {
     kapt(libs.androidx.room.compiler)
 
     // Markdown
-    implementation("com.arnyminerz.markdowntext:markdowntext:1.0.0")
+    implementation("com.colintheshots:twain:0.3.1")
 }
