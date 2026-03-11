@@ -31,5 +31,8 @@ data class ChatMessage(
     val conversationId: Long,
     val sender: Sender,
     val message: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val thinkingContent: String = "",
+    val mediaPath: String? = null,
+    val mediaType: String? = null
 )

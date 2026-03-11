@@ -21,7 +21,9 @@ import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats
 
 data class StreamingState(
     val currentText: String,
-    val tokensGenerated: Int
+    val tokensGenerated: Int,
+    val currentThinking: String = "",
+    val isThinking: Boolean = false
 )
 
 @Composable
@@ -63,7 +65,7 @@ fun MessageList(
     }
 
     // Auto-scroll during streaming (only if user is at bottom, instant scroll)
-    LaunchedEffect(streamingState?.currentText) {
+    LaunchedEffect(streamingState?.currentText, streamingState?.currentThinking) {
         if (streamingState != null && isAtBottom) {
             val lastIndex = listState.layoutInfo.totalItemsCount - 1
             if (lastIndex >= 0) {
@@ -99,6 +101,8 @@ fun MessageList(
                 StreamingMessageBubble(
                     text = streamingState.currentText,
                     tokensGenerated = streamingState.tokensGenerated,
+                    currentThinking = streamingState.currentThinking,
+                    isThinking = streamingState.isThinking,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

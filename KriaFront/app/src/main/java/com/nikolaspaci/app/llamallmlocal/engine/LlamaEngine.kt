@@ -86,6 +86,10 @@ class LlamaEngine @Inject constructor(
                 } else {
                     currentModelPath = modelPath
                     currentSystemPrompt = effectiveParams.systemPrompt
+
+                    // Auto-detect and load multimodal mmproj file
+                    tryInitMultimodal(modelPath)
+
                     _loadState.value = ModelEngine.LoadState.Loaded(modelName)
                     setCrashlyticsModelKeys(modelName, effectiveParams)
                     Result.success(Unit)
@@ -94,6 +98,34 @@ class LlamaEngine @Inject constructor(
                 _loadState.value = ModelEngine.LoadState.Error(e.message ?: "Erreur inconnue")
                 Firebase.crashlytics.recordException(e)
                 Result.failure(e)
+            }
+        }
+    }
+
+    private suspend fun tryInitMultimodal(modelPath: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                val modelFile = File(modelPath)
+                val modelDir = modelFile.parentFile ?: return@withContext
+                val modelBaseName = modelFile.nameWithoutExtension
+
+                // Look for mmproj file in the same directory
+                val mmprojFile = modelDir.listFiles()?.firstOrNull { file ->
+                    file.name.contains("mmproj", ignoreCase = true) &&
+                    file.extension.equals("gguf", ignoreCase = true)
+                }
+
+                if (mmprojFile != null) {
+                    Log.i(TAG, "Found mmproj file: ${mmprojFile.absolutePath}")
+                    val success = LlamaApi.initMultimodal(sessionPtr, mmprojFile.absolutePath)
+                    if (success) {
+                        Log.i(TAG, "Multimodal initialized successfully, hasVision=${LlamaApi.hasVision(sessionPtr)}")
+                    } else {
+                        Log.w(TAG, "Failed to initialize multimodal with mmproj: ${mmprojFile.absolutePath}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error during multimodal init", e)
             }
         }
     }
@@ -139,7 +171,7 @@ class LlamaEngine @Inject constructor(
         }
     }
 
-    override fun predict(prompt: String, parameters: ModelParameter): Flow<PredictionEvent> = callbackFlow {
+    override fun predict(prompt: String, parameters: ModelParameter, enableThinking: Boolean): Flow<PredictionEvent> = callbackFlow {
         if (sessionPtr == 0L) {
             trySend(PredictionEvent.Error("Aucun modele charge", isRecoverable = false))
             close()
@@ -149,6 +181,10 @@ class LlamaEngine @Inject constructor(
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
                 trySend(PredictionEvent.Token(token))
+            }
+
+            override fun onThinkingToken(token: String) {
+                trySend(PredictionEvent.ThinkingToken(token))
             }
 
             override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
@@ -163,7 +199,40 @@ class LlamaEngine @Inject constructor(
             }
         }
 
-        LlamaApi.predict(sessionPtr, prompt, parameters, callback)
+        LlamaApi.predict(sessionPtr, prompt, parameters, enableThinking, callback)
+
+        awaitClose { }
+    }.flowOn(Dispatchers.IO)
+
+    override fun predictWithMedia(prompt: String, imageData: ByteArray?, parameters: ModelParameter, enableThinking: Boolean): Flow<PredictionEvent> = callbackFlow {
+        if (sessionPtr == 0L) {
+            trySend(PredictionEvent.Error("Aucun modele charge", isRecoverable = false))
+            close()
+            return@callbackFlow
+        }
+
+        val callback = object : PredictCallback {
+            override fun onToken(token: String) {
+                trySend(PredictionEvent.Token(token))
+            }
+
+            override fun onThinkingToken(token: String) {
+                trySend(PredictionEvent.ThinkingToken(token))
+            }
+
+            override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
+                trySend(PredictionEvent.Completion(tokensPerSecond, durationInSeconds))
+                close()
+            }
+
+            override fun onError(error: String) {
+                Firebase.crashlytics.recordException(RuntimeException("Prediction error: $error"))
+                trySend(PredictionEvent.Error(error, isRecoverable = true))
+                close()
+            }
+        }
+
+        LlamaApi.predictWithMedia(sessionPtr, prompt, imageData, parameters, enableThinking, callback)
 
         awaitClose { }
     }.flowOn(Dispatchers.IO)
@@ -180,4 +249,12 @@ class LlamaEngine @Inject constructor(
     override fun isModelLoaded(): Boolean = sessionPtr != 0L
 
     override fun getCurrentModelPath(): String? = currentModelPath
+
+    override fun supportsThinking(): Boolean {
+        return sessionPtr != 0L && LlamaApi.supportsThinking(sessionPtr)
+    }
+
+    override fun hasVision(): Boolean {
+        return sessionPtr != 0L && LlamaApi.hasVision(sessionPtr)
+    }
 }

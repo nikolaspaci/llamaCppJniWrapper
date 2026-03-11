@@ -3,6 +3,8 @@ package com.nikolaspaci.app.llamallmlocal.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,8 +25,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats
@@ -51,12 +56,25 @@ fun MessageRow(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.widthIn(max = 320.dp)
             ) {
-                Text(
-                    text = message.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                )
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    // Show attached image if present
+                    if (message.mediaPath != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(Uri.parse(message.mediaPath)),
+                            contentDescription = "Attached image",
+                            modifier = Modifier
+                                .size(150.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Text(
+                        text = message.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     } else {
@@ -66,6 +84,15 @@ fun MessageRow(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            // Show thinking content if available
+            if (message.thinkingContent.isNotEmpty()) {
+                CollapsibleThinkingContent(
+                    thinkingContent = message.thinkingContent,
+                    isStreaming = false
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             MarkdownContent(content = message.message)
 
             // AI Action Row

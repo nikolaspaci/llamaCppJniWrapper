@@ -16,6 +16,7 @@ set(SOURCE_FILES_LIST
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/RestoreHistoryJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/HardwareInfoJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/StopPredictJni.cpp
+    ${PROJECT_SOURCE_DIR}/src/JNIMethods/CapabilitiesJni.cpp
 )
 
 if(ANDROID)
@@ -52,6 +53,8 @@ endif()
 
 set(BUILD_SHARED_LIBS ON)
 set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common utils library" FORCE)
+set(LLAMA_BUILD_TOOLS ON CACHE BOOL "Build tools (includes mtmd)" FORCE)
+set(LLAMA_TOOLS_INSTALL OFF CACHE BOOL "Don't install tool executables" FORCE)
 
 add_subdirectory(extern/llama.cpp llama_cpp_build)
 
@@ -65,6 +68,7 @@ if(ANDROID)
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/ggml/include
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/tools/mtmd
     )
 
     target_compile_options(jniKriaCppWrapper PRIVATE
@@ -78,7 +82,7 @@ if(ANDROID)
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs/${ANDROID_ABI}"
     )
 
-    target_link_libraries(jniKriaCppWrapper PRIVATE llama common)
+    target_link_libraries(jniKriaCppWrapper PRIVATE llama common mtmd)
 
     if(VULKAN_LIB)
         target_link_libraries(jniKriaCppWrapper PRIVATE ${VULKAN_LIB})
@@ -92,13 +96,14 @@ else()
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/include
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/ggml/include
+        ${PROJECT_SOURCE_DIR}/extern/llama.cpp/tools/mtmd
     )
     target_compile_options(jniKriaCppWrapper PRIVATE -march=native -O3)
     find_package(JNI REQUIRED)
     set_target_properties(jniKriaCppWrapper PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs"
     )
-    target_link_libraries(jniKriaCppWrapper PRIVATE llama common)
+    target_link_libraries(jniKriaCppWrapper PRIVATE llama common mtmd)
 endif()
 
 

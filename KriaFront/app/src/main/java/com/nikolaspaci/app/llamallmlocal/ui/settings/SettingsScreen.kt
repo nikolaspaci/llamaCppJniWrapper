@@ -250,6 +250,25 @@ private fun SettingsContent(
                 description = "Maximum response length",
                 error = errors["maxTokens"]
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Enable Thinking", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Allow model to reason before answering (if supported)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = parameters.enableThinking,
+                    onCheckedChange = { onParameterChange(parameters.copy(enableThinking = it)) }
+                )
+            }
         }
 
         // Section Performance

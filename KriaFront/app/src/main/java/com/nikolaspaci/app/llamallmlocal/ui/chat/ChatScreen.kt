@@ -3,6 +3,8 @@ package com.nikolaspaci.app.llamallmlocal.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +44,26 @@ fun ChatScreen(
     val viewModelModelPath by viewModel.currentModelPath.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val hasVision by viewModel.hasVision.collectAsState()
+    val pendingImageUri by viewModel.pendingImageUri.collectAsState()
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+                if (bytes != null) {
+                    viewModel.attachImage(it, bytes)
+                }
+            } catch (e: Exception) {
+                // Ignore errors reading image
+            }
+        }
+    }
 
     LaunchedEffect(viewModelModelPath) {
         viewModelModelPath?.let { path ->
@@ -86,6 +108,10 @@ fun ChatScreen(
                 isEnabled = isModelReady,
                 isGenerating = isGenerating,
                 onStopGeneration = { viewModel.cancelPrediction() },
+                hasVision = hasVision,
+                pendingImageUri = pendingImageUri,
+                onAttachImage = { imagePickerLauncher.launch("image/*") },
+                onRemoveAttachment = { viewModel.removeAttachment() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -133,7 +159,9 @@ fun ChatScreen(
                     messages = state.messages,
                     streamingState = StreamingState(
                         currentText = state.currentResponse,
-                        tokensGenerated = state.tokensGenerated
+                        tokensGenerated = state.tokensGenerated,
+                        currentThinking = state.currentThinking,
+                        isThinking = state.isThinking
                     ),
                     lastMessageStats = null,
                     onCancelGeneration = { viewModel.cancelPrediction() },

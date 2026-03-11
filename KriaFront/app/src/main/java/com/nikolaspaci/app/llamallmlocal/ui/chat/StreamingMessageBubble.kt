@@ -22,6 +22,8 @@ import kotlinx.coroutines.delay
 fun StreamingMessageBubble(
     text: String,
     tokensGenerated: Int,
+    currentThinking: String = "",
+    isThinking: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showCursor by remember { mutableStateOf(true) }
@@ -39,9 +41,18 @@ fun StreamingMessageBubble(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .animateContentSize()
     ) {
-        if (text.isEmpty()) {
+        // Show thinking content if available
+        if (currentThinking.isNotEmpty()) {
+            CollapsibleThinkingContent(
+                thinkingContent = currentThinking,
+                isStreaming = isThinking
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (text.isEmpty() && !isThinking && currentThinking.isEmpty()) {
             ThinkingIndicator()
-        } else {
+        } else if (text.isNotEmpty()) {
             StreamingMarkdownContent(
                 content = text + if (showCursor) "\u258B" else " ",
                 isStreaming = true
@@ -49,6 +60,13 @@ fun StreamingMessageBubble(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            Text(
+                text = "$tokensGenerated tokens",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        } else if (isThinking) {
+            // Still thinking, no response text yet - just show token count
             Text(
                 text = "$tokensGenerated tokens",
                 style = MaterialTheme.typography.labelSmall,

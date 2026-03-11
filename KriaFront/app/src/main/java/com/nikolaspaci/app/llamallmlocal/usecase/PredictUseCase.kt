@@ -10,8 +10,19 @@ class PredictUseCase @Inject constructor(
     private val engine: ModelEngine,
     private val parameterProvider: ModelParameterProvider
 ) {
-    suspend operator fun invoke(prompt: String, modelId: String, conversationId: Long): Flow<PredictionEvent> {
+    suspend operator fun invoke(
+        prompt: String,
+        modelId: String,
+        conversationId: Long,
+        imageData: ByteArray? = null
+    ): Flow<PredictionEvent> {
         val parameters = parameterProvider.getParametersForConversation(conversationId, modelId)
-        return engine.predict(prompt, parameters)
+        val enableThinking = parameters.enableThinking && engine.supportsThinking()
+
+        return if (imageData != null && engine.hasVision()) {
+            engine.predictWithMedia(prompt, imageData, parameters, enableThinking)
+        } else {
+            engine.predict(prompt, parameters, enableThinking)
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.nikolaspaci.app.llamallmlocal.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -44,6 +45,8 @@ sealed class ChatUiState {
     data class Generating(
         val messages: List<ChatMessage>,
         val currentResponse: String,
+        val currentThinking: String,
+        val isThinking: Boolean,
         val tokensGenerated: Int,
         val modelName: String
     ) : ChatUiState()
@@ -78,9 +81,24 @@ class ChatViewModel @Inject constructor(
     private var predictionJob: Job? = null
     private var currentMessages: List<ChatMessage> = emptyList()
     private var accumulatedResponse = StringBuilder()
+    private var accumulatedThinking = StringBuilder()
+    private var isThinking = false
     private var accumulatedTokenCount = 0
     private val _modelPath = MutableStateFlow<String?>(null)
     val currentModelPath: StateFlow<String?> = _modelPath.asStateFlow()
+
+    // Capabilities
+    private val _supportsThinking = MutableStateFlow(false)
+    val supportsThinking: StateFlow<Boolean> = _supportsThinking.asStateFlow()
+
+    private val _hasVision = MutableStateFlow(false)
+    val hasVision: StateFlow<Boolean> = _hasVision.asStateFlow()
+
+    // Pending image attachment
+    private val _pendingImageUri = MutableStateFlow<Uri?>(null)
+    val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
+
+    private var pendingImageData: ByteArray? = null
 
     init {
         observeConversation()
@@ -117,6 +135,8 @@ class ChatViewModel @Inject constructor(
                         )
                     }
                     is ModelEngine.LoadState.Loaded -> {
+                        _supportsThinking.value = engine.supportsThinking()
+                        _hasVision.value = engine.hasVision()
                         updateUiState()
                         engine.restoreHistory(currentMessages)
                         triggerPendingPredictionIfNeeded()
@@ -155,37 +175,68 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun attachImage(uri: Uri, imageBytes: ByteArray) {
+        _pendingImageUri.value = uri
+        pendingImageData = imageBytes
+    }
+
+    fun removeAttachment() {
+        _pendingImageUri.value = null
+        pendingImageData = null
+    }
+
     fun sendMessage(text: String) {
         if (text.isBlank()) return
+
+        val imageData = pendingImageData
+        val imageUri = _pendingImageUri.value
+
+        // Clear attachment
+        _pendingImageUri.value = null
+        pendingImageData = null
 
         viewModelScope.launch {
             val userMessage = ChatMessage(
                 conversationId = conversationId,
                 sender = Sender.USER,
-                message = text.trim()
+                message = text.trim(),
+                mediaPath = imageUri?.toString(),
+                mediaType = if (imageUri != null) "image" else null
             )
+
+            // Optimistically add user message so it appears immediately
+            currentMessages = currentMessages + userMessage
+            _uiState.value = ChatUiState.Ready(
+                messages = currentMessages,
+                modelName = getModelName()
+            )
+
             chatRepository.addMessageToConversation(userMessage)
 
-            startPrediction(text.trim())
+            startPrediction(text.trim(), imageData)
         }
     }
 
-    private fun startPrediction(prompt: String) {
+    private fun startPrediction(prompt: String, imageData: ByteArray? = null) {
         engine.stopPredict()
         predictionJob?.cancel()
 
         predictionJob = viewModelScope.launch {
             accumulatedResponse.clear()
+            accumulatedThinking.clear()
+            isThinking = false
             accumulatedTokenCount = 0
 
             _uiState.value = ChatUiState.Generating(
                 messages = currentMessages,
                 currentResponse = "",
+                currentThinking = "",
+                isThinking = false,
                 tokensGenerated = 0,
                 modelName = getModelName()
             )
 
-            predictUseCase(prompt, _modelPath.value ?: "", conversationId)
+            predictUseCase(prompt, _modelPath.value ?: "", conversationId, imageData)
                 .catch { e ->
                     _uiState.value = ChatUiState.Error(
                         message = e.message ?: "Erreur de prediction",
@@ -198,10 +249,28 @@ class ChatViewModel @Inject constructor(
                         is PredictionEvent.Token -> {
                             accumulatedResponse.append(event.value)
                             accumulatedTokenCount++
+                            isThinking = false
 
                             _uiState.value = ChatUiState.Generating(
                                 messages = currentMessages,
                                 currentResponse = accumulatedResponse.toString(),
+                                currentThinking = accumulatedThinking.toString(),
+                                isThinking = false,
+                                tokensGenerated = accumulatedTokenCount,
+                                modelName = getModelName()
+                            )
+                        }
+
+                        is PredictionEvent.ThinkingToken -> {
+                            accumulatedThinking.append(event.value)
+                            accumulatedTokenCount++
+                            isThinking = true
+
+                            _uiState.value = ChatUiState.Generating(
+                                messages = currentMessages,
+                                currentResponse = accumulatedResponse.toString(),
+                                currentThinking = accumulatedThinking.toString(),
+                                isThinking = true,
                                 tokensGenerated = accumulatedTokenCount,
                                 modelName = getModelName()
                             )
@@ -211,7 +280,8 @@ class ChatViewModel @Inject constructor(
                             val botMessage = ChatMessage(
                                 conversationId = conversationId,
                                 sender = Sender.BOT,
-                                message = accumulatedResponse.toString()
+                                message = accumulatedResponse.toString(),
+                                thinkingContent = accumulatedThinking.toString()
                             )
                             chatRepository.addMessageToConversation(botMessage)
 
@@ -246,12 +316,14 @@ class ChatViewModel @Inject constructor(
         predictionJob = null
 
         val partialResponse = accumulatedResponse.toString()
-        if (partialResponse.isNotEmpty()) {
+        val partialThinking = accumulatedThinking.toString()
+        if (partialResponse.isNotEmpty() || partialThinking.isNotEmpty()) {
             viewModelScope.launch {
                 val botMessage = ChatMessage(
                     conversationId = conversationId,
                     sender = Sender.BOT,
-                    message = partialResponse
+                    message = partialResponse,
+                    thinkingContent = partialThinking
                 )
                 chatRepository.addMessageToConversation(botMessage)
             }

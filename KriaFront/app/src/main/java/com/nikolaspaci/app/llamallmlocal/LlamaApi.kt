@@ -6,6 +6,7 @@ import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
 
 interface PredictCallback {
     fun onToken(token: String)
+    fun onThinkingToken(token: String)
     fun onComplete(tokensPerSecond: Double, durationInSeconds: Long)
     fun onError(error: String)
 }
@@ -21,9 +22,15 @@ object LlamaApi {
     external fun loadBackends(nativeLibDir: String)
     external fun init(modelPath: String, modelParameters: ModelParameter): Long
     external fun free(sessionPtr: Long)
-    external fun predict(sessionPtr: Long, prompt: String, modelParameters: ModelParameter, callback: PredictCallback)
+    external fun predict(sessionPtr: Long, prompt: String, modelParameters: ModelParameter, enableThinking: Boolean, callback: PredictCallback)
+    external fun predictWithMedia(sessionPtr: Long, prompt: String, imageData: ByteArray?, modelParameters: ModelParameter, enableThinking: Boolean, callback: PredictCallback)
     external fun stopPredict(sessionPtr: Long)
     external fun restoreHistory(sessionPtr: Long, messages: Array<ChatMessage>, systemPrompt: String)
+
+    // Capabilities
+    external fun supportsThinking(sessionPtr: Long): Boolean
+    external fun hasVision(sessionPtr: Long): Boolean
+    external fun initMultimodal(sessionPtr: Long, mmprojPath: String): Boolean
 
     // Hardware info methods
     external fun isVulkanAvailable(): Boolean

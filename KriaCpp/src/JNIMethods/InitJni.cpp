@@ -75,6 +75,12 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(JNIEnv *env, jobject /* thi
         return 0;
     }
 
+    // Initialize chat templates and detect thinking support
+    session->chatTemplates = common_chat_templates_init(session->model.get(), "");
+    if (session->chatTemplates) {
+        session->thinkingSupported = common_chat_templates_support_enable_thinking(session->chatTemplates.get());
+    }
+
     // Return the pointer to the session
     return reinterpret_cast<jlong>(session);
 }

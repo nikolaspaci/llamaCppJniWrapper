@@ -6,6 +6,10 @@ sealed class PredictionEvent {
         val tokenIndex: Int = 0
     ) : PredictionEvent()
 
+    data class ThinkingToken(
+        val value: String
+    ) : PredictionEvent()
+
     data class Progress(
         val tokensGenerated: Int,
         val estimatedTotal: Int? = null

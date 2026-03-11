@@ -25,7 +25,7 @@ object LlamaJniService {
         return sessionPtr != 0L
     }
 
-    fun predict(prompt: String, modelParameter: ModelParameter): Flow<PredictionEvent> = callbackFlow {
+    fun predict(prompt: String, modelParameter: ModelParameter, enableThinking: Boolean = false): Flow<PredictionEvent> = callbackFlow {
         if (sessionPtr == 0L) {
             close(IllegalStateException("Error: Model not loaded"))
             return@callbackFlow
@@ -34,6 +34,10 @@ object LlamaJniService {
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
                 trySend(PredictionEvent.Token(token))
+            }
+
+            override fun onThinkingToken(token: String) {
+                trySend(PredictionEvent.ThinkingToken(token))
             }
 
             override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
@@ -47,7 +51,7 @@ object LlamaJniService {
         }
 
         // This call is blocking on the current thread until the native side calls onComplete or onError
-        LlamaApi.predict(sessionPtr, prompt, modelParameter, callback)
+        LlamaApi.predict(sessionPtr, prompt, modelParameter, enableThinking, callback)
 
         // awaitClose is needed to keep the flow open until close() is called
         awaitClose {
