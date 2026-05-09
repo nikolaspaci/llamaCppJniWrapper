@@ -20,9 +20,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.nikolaspaci.app.llamallmlocal.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -90,7 +92,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                                 contentDescription = null
                             )
                         },
-                        label = { Text("New Chat") },
+                        label = { Text(stringResource(R.string.nav_new_chat)) },
                         selected = navController.currentDestination?.route == Screen.Home.route,
                         onClick = {
                             navController.navigate(Screen.Home.route)
@@ -99,7 +101,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                     )
                     HorizontalDivider()
                     Text(
-                        text = "Chats",
+                        text = stringResource(R.string.nav_chats),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp)
@@ -108,7 +110,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                     SearchBar(
                         query = searchQuery,
                         onQueryChange = historyViewModel::updateSearchQuery,
-                        placeholder = "Search conversations...",
+                        placeholder = stringResource(R.string.nav_search_conversations),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                     HistoryMenuItems(

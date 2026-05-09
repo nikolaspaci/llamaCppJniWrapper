@@ -24,9 +24,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatErrorType
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
 import java.io.File
@@ -53,11 +56,14 @@ fun ChatScreen(
     ) { uri ->
         uri?.let {
             try {
-                val inputStream = context.contentResolver.openInputStream(it)
-                val bytes = inputStream?.readBytes()
-                inputStream?.close()
-                if (bytes != null) {
-                    viewModel.attachImage(it, bytes)
+                val bitmap = android.graphics.BitmapFactory.decodeStream(
+                    context.contentResolver.openInputStream(it)
+                )
+                if (bitmap != null) {
+                    val stream = java.io.ByteArrayOutputStream()
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    bitmap.recycle()
+                    viewModel.attachImage(it, stream.toByteArray())
                 }
             } catch (e: Exception) {
                 // Ignore errors reading image
@@ -187,6 +193,11 @@ fun ChatScreen(
             }
 
             is ChatUiState.Error -> {
+                val errorMessage = when (val type = state.errorType) {
+                    ChatErrorType.ModelUnavailable -> stringResource(R.string.chat_error_model_unavailable)
+                    ChatErrorType.PredictionFailed -> stringResource(R.string.chat_error_prediction)
+                    is ChatErrorType.Generic -> type.message
+                }
                 if (state.previousMessages != null && state.previousMessages.isNotEmpty()) {
                     // Show messages + snackbar for recoverable errors
                     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -199,12 +210,12 @@ fun ChatScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                    LaunchedEffect(state.message) {
-                        snackbarHostState.showSnackbar(state.message)
+                    LaunchedEffect(errorMessage) {
+                        snackbarHostState.showSnackbar(errorMessage)
                     }
                 } else {
                     ErrorScreen(
-                        message = state.message,
+                        message = errorMessage,
                         onRetry = if (state.canRetry) {{ viewModel.retry() }} else null,
                         modifier = Modifier.padding(paddingValues)
                     )

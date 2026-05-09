@@ -29,6 +29,12 @@ data class Stats(
     val totalTokens: Int = 0
 )
 
+sealed class ChatErrorType {
+    object ModelUnavailable : ChatErrorType()
+    object PredictionFailed : ChatErrorType()
+    data class Generic(val message: String) : ChatErrorType()
+}
+
 sealed class ChatUiState {
     object Idle : ChatUiState()
 
@@ -58,7 +64,7 @@ sealed class ChatUiState {
     ) : ChatUiState()
 
     data class Error(
-        val message: String,
+        val errorType: ChatErrorType,
         val previousMessages: List<ChatMessage>? = null,
         val canRetry: Boolean = true
     ) : ChatUiState()
@@ -143,7 +149,7 @@ class ChatViewModel @Inject constructor(
                     }
                     is ModelEngine.LoadState.Error -> {
                         _uiState.value = ChatUiState.Error(
-                            message = state.message,
+                            errorType = ChatErrorType.Generic(state.message),
                             previousMessages = currentMessages,
                             canRetry = true
                         )
@@ -155,6 +161,14 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun loadModel(path: String) {
+        if (path.isBlank() || !File(path).exists()) {
+            _uiState.value = ChatUiState.Error(
+                errorType = ChatErrorType.ModelUnavailable,
+                previousMessages = currentMessages,
+                canRetry = false
+            )
+            return
+        }
         val parameters = parameterProvider.getParametersForConversation(conversationId, path)
         engine.loadModel(path, parameters)
     }
@@ -238,8 +252,9 @@ class ChatViewModel @Inject constructor(
 
             predictUseCase(prompt, _modelPath.value ?: "", conversationId, imageData)
                 .catch { e ->
+                    val msg = e.message
                     _uiState.value = ChatUiState.Error(
-                        message = e.message ?: "Erreur de prediction",
+                        errorType = if (msg.isNullOrBlank()) ChatErrorType.PredictionFailed else ChatErrorType.Generic(msg),
                         previousMessages = currentMessages,
                         canRetry = true
                     )
@@ -298,7 +313,7 @@ class ChatViewModel @Inject constructor(
 
                         is PredictionEvent.Error -> {
                             _uiState.value = ChatUiState.Error(
-                                message = event.message,
+                                errorType = ChatErrorType.Generic(event.message),
                                 previousMessages = currentMessages,
                                 canRetry = event.isRecoverable
                             )
@@ -355,7 +370,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun getModelName(): String {
-        return _modelPath.value?.let { File(it).nameWithoutExtension } ?: "Aucun modele"
+        return _modelPath.value?.let { File(it).nameWithoutExtension } ?: ""
     }
 
     override fun onCleared() {

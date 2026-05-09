@@ -15,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import kotlinx.coroutines.delay
 
 @Composable
@@ -61,14 +63,14 @@ fun StreamingMessageBubble(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "$tokensGenerated tokens",
+                text = stringResource(R.string.chat_tokens_count, tokensGenerated),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         } else if (isThinking) {
             // Still thinking, no response text yet - just show token count
             Text(
-                text = "$tokensGenerated tokens",
+                text = stringResource(R.string.chat_tokens_count, tokensGenerated),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )

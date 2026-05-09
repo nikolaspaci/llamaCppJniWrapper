@@ -16,6 +16,7 @@
         android:roundIcon="@mipmap/ic_launcher_llm_round"
         android:supportsRtl="true"
         android:extractNativeLibs="true"
+        android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.Kria">
         <activity
             android:name=".MainActivity"

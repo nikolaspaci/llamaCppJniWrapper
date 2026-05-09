@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import com.nikolaspaci.app.llamallmlocal.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,23 +40,23 @@ fun AdaptiveTopBar(
         navigationIcon = {
             if (onNavigateBack != null) {
                 IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
                 }
             } else if (onOpenDrawer != null) {
                 IconButton(onClick = onOpenDrawer) {
-                    Icon(Icons.Rounded.Menu, contentDescription = "Menu")
+                    Icon(Icons.Rounded.Menu, contentDescription = stringResource(R.string.nav_menu))
                 }
             }
         },
         actions = {
             if (onNewChat != null) {
                 IconButton(onClick = onNewChat) {
-                    Icon(Icons.Rounded.Add, contentDescription = "New chat")
+                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.nav_new_chat))
                 }
             }
             if (onNavigateToSettings != null) {
                 IconButton(onClick = onNavigateToSettings) {
-                    Icon(Icons.Rounded.Settings, contentDescription = "Settings")
+                    Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.nav_settings))
                 }
             }
         },

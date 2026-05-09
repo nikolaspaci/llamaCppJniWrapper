@@ -23,15 +23,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 
 @Composable
 fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Search...",
+    placeholder: String = "",
     onSearch: (() -> Unit)? = null
 ) {
     Surface(
@@ -48,7 +50,7 @@ fun SearchBar(
         ) {
             Icon(
                 Icons.Rounded.Search,
-                contentDescription = "Search",
+                contentDescription = stringResource(R.string.common_search),
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
@@ -94,7 +96,7 @@ fun SearchBar(
                 ) {
                     Icon(
                         Icons.Rounded.Clear,
-                        contentDescription = "Clear",
+                        contentDescription = stringResource(R.string.common_clear),
                         modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

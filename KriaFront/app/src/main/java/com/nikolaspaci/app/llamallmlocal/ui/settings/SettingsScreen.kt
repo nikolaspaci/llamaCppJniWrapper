@@ -12,10 +12,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
 import com.nikolaspaci.app.llamallmlocal.data.database.SystemPromptPreset
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
@@ -50,15 +52,15 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Model Settings") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.resetToDefaults() }) {
-                        Icon(Icons.Default.Refresh, "Reset")
+                        Icon(Icons.Default.Refresh, stringResource(R.string.settings_reset))
                     }
                 }
             )
@@ -67,7 +69,7 @@ fun SettingsScreen(
         Column(modifier = Modifier.padding(padding)) {
             // Model Selection section
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            SettingsSection(title = "Model") {
+            SettingsSection(title = stringResource(R.string.settings_section_model)) {
                 ModelSelector(
                     modelFileViewModel = modelFileViewModel,
                     selectedModelPath = currentModelId,
@@ -184,70 +186,71 @@ private fun SettingsContent(
         )
 
         // Section Sampling
-        SettingsSection(title = "Sampling Parameters") {
+        SettingsSection(title = stringResource(R.string.settings_section_sampling)) {
             ParameterSlider(
-                label = "Temperature",
+                label = stringResource(R.string.settings_temperature),
                 value = parameters.temperature,
                 onValueChange = { onParameterChange(parameters.copy(temperature = it)) },
                 valueRange = ModelParameter.TEMPERATURE_RANGE,
-                description = "Controls creativity (0 = deterministic, 2 = very creative)",
+                description = stringResource(R.string.settings_temperature_desc),
                 error = errors["temperature"]
             )
 
             ParameterIntSlider(
-                label = "Top K",
+                label = stringResource(R.string.settings_topk),
                 value = parameters.topK,
                 onValueChange = { onParameterChange(parameters.copy(topK = it)) },
                 valueRange = ModelParameter.TOP_K_RANGE,
-                description = "Number of candidate tokens to consider",
+                description = stringResource(R.string.settings_topk_desc),
                 error = errors["topK"]
             )
 
             ParameterSlider(
-                label = "Top P (Nucleus)",
+                label = stringResource(R.string.settings_topp),
                 value = parameters.topP,
                 onValueChange = { onParameterChange(parameters.copy(topP = it)) },
                 valueRange = ModelParameter.TOP_P_RANGE,
-                description = "Cumulative probability of tokens to consider",
+                description = stringResource(R.string.settings_topp_desc),
                 error = errors["topP"]
             )
 
             ParameterSlider(
-                label = "Min P",
+                label = stringResource(R.string.settings_minp),
                 value = parameters.minP,
                 onValueChange = { onParameterChange(parameters.copy(minP = it)) },
                 valueRange = ModelParameter.MIN_P_RANGE,
-                description = "Minimum probability threshold",
+                description = stringResource(R.string.settings_minp_desc),
                 error = errors["minP"]
             )
 
             ParameterSlider(
-                label = "Repeat Penalty",
+                label = stringResource(R.string.settings_repeat_penalty),
                 value = parameters.repeatPenalty,
                 onValueChange = { onParameterChange(parameters.copy(repeatPenalty = it)) },
                 valueRange = ModelParameter.REPEAT_PENALTY_RANGE,
-                description = "Penalty to avoid repetitions",
+                description = stringResource(R.string.settings_repeat_penalty_desc),
                 error = errors["repeatPenalty"]
             )
         }
 
         // Generation section
-        SettingsSection(title = "Generation Parameters") {
+        SettingsSection(title = stringResource(R.string.settings_section_generation)) {
+            val contextUnitLabel = stringResource(R.string.settings_context_size_unit, 0).replace("0", "%d")
             ParameterDropdown(
-                label = "Context Size",
+                label = stringResource(R.string.settings_context_size),
                 value = parameters.contextSize,
                 options = ModelParameter.CONTEXT_SIZE_VALUES,
                 onValueChange = { onParameterChange(parameters.copy(contextSize = it)) },
-                formatOption = { "$it tokens" },
-                description = "Model context memory"
+                formatOption = { contextUnitLabel.format(it) },
+                description = stringResource(R.string.settings_context_size_desc)
             )
 
             ParameterIntSlider(
-                label = "Max Tokens",
+                label = stringResource(R.string.settings_max_tokens),
                 value = parameters.maxTokens,
                 onValueChange = { onParameterChange(parameters.copy(maxTokens = it)) },
                 valueRange = ModelParameter.MAX_TOKENS_RANGE,
-                description = "Maximum response length",
+                description = stringResource(R.string.settings_max_tokens_desc),
                 error = errors["maxTokens"]
             )
 
@@ -257,9 +260,9 @@ private fun SettingsContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Enable Thinking", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.settings_enable_thinking), style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Allow model to reason before answering (if supported)",
+                        stringResource(R.string.settings_enable_thinking_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -272,13 +275,13 @@ private fun SettingsContent(
         }
 
         // Section Performance
-        SettingsSection(title = "Performance") {
+        SettingsSection(title = stringResource(R.string.settings_section_performance)) {
             ParameterIntSlider(
-                label = "Threads CPU",
+                label = stringResource(R.string.settings_threads_cpu),
                 value = parameters.threadCount,
                 onValueChange = { onParameterChange(parameters.copy(threadCount = it)) },
                 valueRange = 1..ModelParameter.getMaxThreads(),
-                description = "Number of threads for inference (max: ${ModelParameter.getMaxThreads()})",
+                description = stringResource(R.string.settings_threads_cpu_desc, ModelParameter.getMaxThreads()),
                 error = errors["threadCount"]
             )
 
@@ -288,9 +291,9 @@ private fun SettingsContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("GPU Acceleration", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.settings_gpu_acceleration), style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "Use Vulkan if available",
+                        stringResource(R.string.settings_gpu_acceleration_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -308,7 +311,7 @@ private fun SettingsContent(
             enabled = errors.isEmpty(),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Save")
+            Text(stringResource(R.string.common_save))
         }
     }
 }
@@ -335,15 +338,16 @@ private fun SystemPromptSection(
         if (presets.none { it.name == name && it.prompt == systemPrompt }) null else name
     }
 
-    SettingsSection(title = "System Prompt") {
+    SettingsSection(title = stringResource(R.string.settings_section_system_prompt)) {
         // Preset dropdown
         if (presets.isNotEmpty()) {
             ExposedDropdownMenuBox(
                 expanded = presetDropdownExpanded,
                 onExpandedChange = { presetDropdownExpanded = it }
             ) {
+                val loadPresetLabel = stringResource(R.string.settings_load_preset)
                 OutlinedTextField(
-                    value = displayedName ?: "Load a preset...",
+                    value = displayedName ?: loadPresetLabel,
                     onValueChange = {},
                     readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = presetDropdownExpanded) },
@@ -382,7 +386,7 @@ private fun SystemPromptSection(
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = "Delete preset",
+                                        contentDescription = stringResource(R.string.settings_delete_preset),
                                         modifier = Modifier.size(18.dp),
                                         tint = MaterialTheme.colorScheme.error
                                     )
@@ -400,8 +404,8 @@ private fun SystemPromptSection(
         OutlinedTextField(
             value = systemPrompt,
             onValueChange = onSystemPromptChange,
-            label = { Text("System prompt") },
-            placeholder = { Text("Ex: You are a helpful translator...") },
+            label = { Text(stringResource(R.string.settings_system_prompt_label)) },
+            placeholder = { Text(stringResource(R.string.settings_system_prompt_placeholder)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 120.dp),
@@ -409,12 +413,13 @@ private fun SystemPromptSection(
             maxLines = 8,
             isError = error != null,
             supportingText = {
+                val descLabel = stringResource(R.string.settings_system_prompt_desc)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = error ?: "Defines the model's behavior and personality",
+                        text = error ?: descLabel,
                         color = if (error != null) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -439,7 +444,7 @@ private fun SystemPromptSection(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Save as preset")
+                Text(stringResource(R.string.settings_save_as_preset))
             }
         }
     }
@@ -449,12 +454,12 @@ private fun SystemPromptSection(
         var presetName by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
-            title = { Text("Save preset") },
+            title = { Text(stringResource(R.string.settings_save_preset_dialog_title)) },
             text = {
                 OutlinedTextField(
                     value = presetName,
                     onValueChange = { presetName = it },
-                    label = { Text("Preset name") },
+                    label = { Text(stringResource(R.string.settings_preset_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -469,12 +474,12 @@ private fun SystemPromptSection(
                     },
                     enabled = presetName.isNotBlank()
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.common_save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSaveDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )

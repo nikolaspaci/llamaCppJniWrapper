@@ -41,9 +41,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
+import com.nikolaspaci.app.llamallmlocal.R
 
 private enum class InputState { EMPTY, HAS_TEXT, GENERATING }
 
@@ -79,7 +81,7 @@ fun SmartChatInput(
                 Box {
                     Image(
                         painter = rememberAsyncImagePainter(pendingImageUri),
-                        contentDescription = "Attached image",
+                        contentDescription = stringResource(R.string.chat_attached_image),
                         modifier = Modifier
                             .size(80.dp)
                             .clip(RoundedCornerShape(12.dp)),
@@ -98,7 +100,7 @@ fun SmartChatInput(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
-                                contentDescription = "Remove image",
+                                contentDescription = stringResource(R.string.chat_remove_image),
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
@@ -128,7 +130,7 @@ fun SmartChatInput(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Image,
-                            contentDescription = "Attach image",
+                            contentDescription = stringResource(R.string.chat_attach_image),
                             modifier = Modifier.size(20.dp),
                             tint = if (pendingImageUri != null)
                                 MaterialTheme.colorScheme.primary
@@ -148,7 +150,7 @@ fun SmartChatInput(
                 ) {
                     if (text.isEmpty()) {
                         Text(
-                            text = "Message",
+                            text = stringResource(R.string.chat_message_placeholder),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -186,7 +188,7 @@ fun SmartChatInput(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowUpward,
-                                    contentDescription = "Send",
+                                    contentDescription = stringResource(R.string.chat_send),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -207,7 +209,7 @@ fun SmartChatInput(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Rounded.ArrowUpward,
-                                        contentDescription = "Send",
+                                        contentDescription = stringResource(R.string.chat_send),
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -224,7 +226,7 @@ fun SmartChatInput(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Rounded.Stop,
-                                        contentDescription = "Stop generation",
+                                        contentDescription = stringResource(R.string.chat_stop_generation),
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(20.dp)
                                     )

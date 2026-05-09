@@ -36,12 +36,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.huggingface.HfModel
 import com.nikolaspaci.app.llamallmlocal.data.huggingface.HfModelDetail
 import com.nikolaspaci.app.llamallmlocal.data.huggingface.HfSibling
 import com.nikolaspaci.app.llamallmlocal.ui.common.SearchBar
+import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceErrorContext
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceViewModel
 
@@ -65,10 +68,10 @@ fun HuggingFaceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Download from Hugging Face") },
+                title = { Text(stringResource(R.string.hf_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -118,8 +121,15 @@ fun HuggingFaceScreen(
                     DownloadCompleteContent()
                 }
                 is HuggingFaceUiState.Error -> {
+                    val displayMessage = state.message ?: stringResource(
+                        when (state.context) {
+                            HuggingFaceErrorContext.SEARCH -> R.string.hf_search_failed
+                            HuggingFaceErrorContext.LOAD_DETAILS -> R.string.hf_load_details_failed
+                            HuggingFaceErrorContext.DOWNLOAD -> R.string.hf_error_title
+                        }
+                    )
                     ErrorContent(
-                        message = state.message,
+                        message = displayMessage,
                         onRetry = state.retryAction,
                         onBack = onNavigateBack
                     )
@@ -141,7 +151,7 @@ private fun SearchContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Search for GGUF models",
+            text = stringResource(R.string.hf_search_title),
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
@@ -149,7 +159,7 @@ private fun SearchContent(
             query = query,
             onQueryChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = "e.g. llama, mistral, phi...",
+            placeholder = stringResource(R.string.hf_search_placeholder),
             onSearch = onSearch
         )
     }
@@ -165,7 +175,7 @@ private fun SearchingContent(query: String) {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Searching for \"$query\"...")
+        Text(stringResource(R.string.hf_searching_for, query))
     }
 }
 
@@ -182,18 +192,18 @@ private fun SearchResultsContent(
             query = query,
             onQueryChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = "e.g. llama, mistral, phi...",
+            placeholder = stringResource(R.string.hf_search_placeholder),
             onSearch = onSearch
         )
         Spacer(modifier = Modifier.height(12.dp))
 
         if (models.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No GGUF models found. Try a different search.")
+                Text(stringResource(R.string.hf_no_models_found))
             }
         } else {
             Text(
-                text = "${models.size} model(s) found",
+                text = stringResource(R.string.hf_models_found, models.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -222,14 +232,14 @@ private fun ModelCard(model: HfModel, onClick: () -> Unit) {
             )
             model.author?.let {
                 Text(
-                    text = "by $it",
+                    text = stringResource(R.string.hf_by_author, it),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = formatDownloads(model.downloads) + " downloads",
+                text = stringResource(R.string.hf_downloads_count, formatDownloads(model.downloads)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -246,7 +256,7 @@ private fun LoadingFilesContent(modelId: String) {
     ) {
         CircularProgressIndicator()
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Loading files for $modelId...")
+        Text(stringResource(R.string.hf_loading_files, modelId))
     }
 }
 
@@ -259,7 +269,7 @@ private fun ModelFilesContent(
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to results")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.hf_back_to_results))
             }
             Text(
                 text = detail.id,
@@ -274,11 +284,11 @@ private fun ModelFilesContent(
         val ggufFiles = detail.ggufFiles
         if (ggufFiles.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No GGUF files found in this repository.")
+                Text(stringResource(R.string.hf_no_gguf_in_repo))
             }
         } else {
             Text(
-                text = "${ggufFiles.size} GGUF file(s)",
+                text = stringResource(R.string.hf_files_count, ggufFiles.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -322,7 +332,7 @@ private fun FileCard(file: HfSibling, onDownload: () -> Unit) {
             IconButton(onClick = onDownload) {
                 Icon(
                     Icons.Default.Download,
-                    contentDescription = "Download",
+                    contentDescription = stringResource(R.string.hf_download),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -344,7 +354,7 @@ private fun DownloadingContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Downloading",
+            text = stringResource(R.string.hf_downloading),
             style = MaterialTheme.typography.titleMedium
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -378,7 +388,7 @@ private fun DownloadingContent(
 
         Spacer(modifier = Modifier.height(24.dp))
         OutlinedButton(onClick = onCancel) {
-            Text("Cancel")
+            Text(stringResource(R.string.common_cancel))
         }
     }
 }
@@ -392,7 +402,7 @@ private fun DownloadCompleteContent() {
     ) {
         CircularProgressIndicator(modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Download complete! Returning...")
+        Text(stringResource(R.string.hf_download_complete))
     }
 }
 
@@ -408,7 +418,7 @@ private fun ErrorContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Error",
+            text = stringResource(R.string.hf_error_title),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.error
         )
@@ -421,11 +431,11 @@ private fun ErrorContent(
         Spacer(modifier = Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onBack) {
-                Text("Go Back")
+                Text(stringResource(R.string.hf_go_back))
             }
             if (onRetry != null) {
                 Button(onClick = onRetry) {
-                    Text("Retry")
+                    Text(stringResource(R.string.common_retry))
                 }
             }
         }

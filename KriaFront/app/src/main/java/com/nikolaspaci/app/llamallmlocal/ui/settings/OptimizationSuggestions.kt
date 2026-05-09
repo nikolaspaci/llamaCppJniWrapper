@@ -16,7 +16,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.util.OptimizationSuggestion
 
 @Composable
@@ -47,7 +49,7 @@ fun OptimizationSuggestions(
                     tint = MaterialTheme.colorScheme.onTertiaryContainer
                 )
                 Text(
-                    text = "Optimization Suggestions",
+                    text = stringResource(R.string.optimization_title),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer
                 )
@@ -86,7 +88,7 @@ private fun SuggestionItem(
             )
         }
         TextButton(onClick = onApply) {
-            Text("Apply")
+            Text(stringResource(R.string.common_apply))
         }
     }
 }

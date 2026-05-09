@@ -12,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.database.ConversationWithMessages
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryUiState
@@ -33,8 +35,8 @@ fun HistoryMenuItems(
     if (conversationToDelete != null) {
         AlertDialog(
             onDismissRequest = { conversationToDelete = null },
-            title = { Text("Delete Conversation") },
-            text = { Text("Are you sure you want to permanently delete this conversation?") },
+            title = { Text(stringResource(R.string.history_delete_title)) },
+            text = { Text(stringResource(R.string.history_delete_message)) },
             confirmButton = {
                 Button(onClick = {
                     conversationToDelete?.let {
@@ -43,10 +45,10 @@ fun HistoryMenuItems(
                         onConversationDeleted(deletedId)
                     }
                     conversationToDelete = null // Dismiss dialog
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                Button(onClick = { conversationToDelete = null }) { Text("Cancel") }
+                Button(onClick = { conversationToDelete = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -63,8 +65,10 @@ fun HistoryMenuItems(
                 ListItem(
                     headlineContent = {
                         Text(
-                            if (searchQuery.isNotBlank()) "No matching conversations."
-                            else "No conversations yet."
+                            stringResource(
+                                if (searchQuery.isNotBlank()) R.string.history_no_match
+                                else R.string.history_no_conversations
+                            )
                         )
                     }
                 )
@@ -74,19 +78,19 @@ fun HistoryMenuItems(
                         val title = conversation.messages
                             .firstOrNull { it.sender == Sender.USER }
                             ?.let { "'${it.message.take(25)}...'" }
-                            ?: "Conversation #${conversation.conversation.id}"
+                            ?: stringResource(R.string.history_conversation_label, conversation.conversation.id)
 
                         ListItem(
                             headlineContent = { Text(title) },
                             supportingContent = {
                                 Column {
                                     Text(
-                                        text = "Model: ${File(conversation.conversation.modelPath).name}",
+                                        text = stringResource(R.string.history_model_prefix, File(conversation.conversation.modelPath).name),
                                         style = MaterialTheme.typography.bodySmall,
                                         maxLines = 1
                                     )
                                     Text(
-                                        text = "Messages: ${conversation.messages.size}",
+                                        text = stringResource(R.string.history_messages_count, conversation.messages.size),
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }

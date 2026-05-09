@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.nikolaspaci.app.llamallmlocal.R
 
 @Composable
 fun CopyButton(
@@ -20,20 +22,22 @@ fun CopyButton(
     onCopied: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val copiedToast = stringResource(R.string.common_copied_toast)
+    val copyDescription = stringResource(R.string.common_copy)
 
     IconButton(
         onClick = {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("text", textToCopy)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(context, "Copie", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, copiedToast, Toast.LENGTH_SHORT).show()
             onCopied()
         },
         modifier = modifier
     ) {
         Icon(
             imageVector = Icons.Default.ContentCopy,
-            contentDescription = "Copier",
+            contentDescription = copyDescription,
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

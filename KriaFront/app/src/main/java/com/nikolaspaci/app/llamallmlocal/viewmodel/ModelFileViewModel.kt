@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nikolaspaci.app.llamallmlocal.data.ModelStorageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,8 @@ class ModelFileViewModel(
     private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
+    private val storageManager = ModelStorageManager(context)
+
     private val _cachedModels = MutableStateFlow<List<File>>(emptyList())
     val cachedModels: StateFlow<List<File>> = _cachedModels.asStateFlow()
 
@@ -31,10 +34,7 @@ class ModelFileViewModel(
 
     fun loadCachedModels() {
         viewModelScope.launch(Dispatchers.IO) {
-            val files = context.cacheDir.listFiles()
-                ?.filter { it.isFile && it.name.endsWith(".gguf", ignoreCase = true) }
-                ?: emptyList()
-            _cachedModels.value = files
+            _cachedModels.value = storageManager.listAllModels()
         }
     }
 
@@ -48,18 +48,16 @@ class ModelFileViewModel(
                 }
 
                 if (fileName == null) {
-                    // Could not determine file name
                     withContext(Dispatchers.Main) { onResult(null) }
                     return@launch
                 }
 
-                val outputFile = File(context.cacheDir, fileName)
+                val outputFile = storageManager.modelFile(fileName)
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     FileOutputStream(outputFile).use { outputStream ->
                         inputStream.copyTo(outputStream)
                     }
                 }
-                // Reload the list of cached models
                 loadCachedModels()
                 withContext(Dispatchers.Main) {
                     onResult(outputFile.absolutePath)
@@ -73,11 +71,49 @@ class ModelFileViewModel(
         }
     }
 
+    fun cacheVisionAdapter(uri: Uri, forModelPath: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    cursor.moveToFirst()
+                    cursor.getString(nameIndex)
+                }
+
+                if (fileName == null) {
+                    withContext(Dispatchers.Main) { onResult(false) }
+                    return@launch
+                }
+
+                val targetDir = File(forModelPath).parentFile ?: storageManager.modelsRoot()
+                val outputFile = File(targetDir, fileName)
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    FileOutputStream(outputFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                withContext(Dispatchers.Main) { onResult(true) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false) }
+            }
+        }
+    }
+
+    fun hasVisionAdapter(modelPath: String): Boolean {
+        return storageManager.hasVisionAdapter(modelPath)
+    }
+
     fun saveModelPath(path: String) {
         sharedPreferences.edit().putString(MODEL_PATH_KEY, path).apply()
     }
 
     fun getModelPath(): String? {
-        return sharedPreferences.getString(MODEL_PATH_KEY, null)
+        val savedPath = sharedPreferences.getString(MODEL_PATH_KEY, null) ?: return null
+        if (!File(savedPath).exists()) {
+            sharedPreferences.edit().remove(MODEL_PATH_KEY).apply()
+            return null
+        }
+        return savedPath
     }
 }

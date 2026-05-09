@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.util.DeviceCapabilities
 
 @Composable
@@ -46,7 +48,7 @@ fun HardwareInfoCard(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Hardware Configuration",
+                    text = stringResource(R.string.hardware_title),
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -55,15 +57,22 @@ fun HardwareInfoCard(
 
             // CPU
             HardwareInfoRow(
-                label = "CPU",
-                value = "${capabilities.cpuCores} cores (${capabilities.cpuArchitecture})"
+                label = stringResource(R.string.hardware_cpu),
+                value = stringResource(
+                    R.string.hardware_cpu_value,
+                    capabilities.cpuCores,
+                    capabilities.cpuArchitecture
+                )
             )
 
             // RAM
             HardwareInfoRow(
-                label = "RAM",
-                value = "${formatBytesDisplay(capabilities.totalRamBytes)} total, " +
-                       "${formatBytesDisplay(capabilities.availableRamBytes)} available"
+                label = stringResource(R.string.hardware_ram),
+                value = stringResource(
+                    R.string.hardware_ram_value,
+                    formatBytesDisplay(capabilities.totalRamBytes),
+                    formatBytesDisplay(capabilities.availableRamBytes)
+                )
             )
 
             // GPU / Vulkan
@@ -75,7 +84,7 @@ fun HardwareInfoCard(
                 ) {
                     Column {
                         Text(
-                            text = "GPU",
+                            text = stringResource(R.string.hardware_gpu),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -85,7 +94,7 @@ fun HardwareInfoCard(
                         )
                         if (capabilities.gpuVramBytes > 0) {
                             Text(
-                                text = "VRAM: ${formatBytesDisplay(capabilities.gpuVramBytes)}",
+                                text = stringResource(R.string.hardware_vram, formatBytesDisplay(capabilities.gpuVramBytes)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -102,7 +111,7 @@ fun HardwareInfoCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "GPU available",
+                            text = stringResource(R.string.hardware_gpu_available),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF4CAF50)
                         )
@@ -111,7 +120,7 @@ fun HardwareInfoCard(
 
                 if (capabilities.recommendedGpuLayers > 0) {
                     Text(
-                        text = "Recommended GPU layers: ${capabilities.recommendedGpuLayers}",
+                        text = stringResource(R.string.hardware_gpu_layers, capabilities.recommendedGpuLayers),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -128,7 +137,7 @@ fun HardwareInfoCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "GPU acceleration not available",
+                        text = stringResource(R.string.hardware_gpu_unavailable),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFFF9800)
                     )
@@ -138,8 +147,8 @@ fun HardwareInfoCard(
             // NPU
             if (capabilities.hasNpu) {
                 HardwareInfoRow(
-                    label = "NPU",
-                    value = capabilities.npuType ?: "Available"
+                    label = stringResource(R.string.hardware_npu),
+                    value = capabilities.npuType ?: stringResource(R.string.hardware_npu_available)
                 )
             }
         }

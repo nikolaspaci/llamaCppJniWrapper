@@ -12,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import java.io.File
 
@@ -45,7 +47,7 @@ fun ModelSelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Select a Model") },
+        title = { Text(stringResource(R.string.model_selector_select)) },
         text = {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -53,7 +55,7 @@ fun ModelSelectionDialog(
                 }
             } else {
                 Column {
-                    Text("Choose a previously used model or browse for a new one.")
+                    Text(stringResource(R.string.model_dialog_description))
                     Spacer(Modifier.height(16.dp))
                     LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                         items(cachedModels) { file ->
@@ -76,12 +78,12 @@ fun ModelSelectionDialog(
                 },
                 enabled = !isLoading
             ) {
-                Text("Browse New")
+                Text(stringResource(R.string.model_dialog_browse))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest, enabled = !isLoading) {
-                Text("Cancel")
+                Text(stringResource(R.string.common_cancel))
             }
         }
     )

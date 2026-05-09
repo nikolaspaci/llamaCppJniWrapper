@@ -29,9 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.syntax.CodeHighlighter
 import com.nikolaspaci.app.llamallmlocal.ui.syntax.currentSyntaxColors
 
@@ -75,7 +77,7 @@ fun CodeBlock(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.ContentCopy,
-                        contentDescription = "Copy code",
+                        contentDescription = stringResource(R.string.common_copy),
                         tint = syntaxColors.text.copy(alpha = 0.7f),
                         modifier = Modifier.size(16.dp)
                     )

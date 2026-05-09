@@ -117,25 +117,25 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
 
     auto applyWithFallback = [&]() -> bool {
         if (session->chatTemplates) {
-            // Only use Jinja when thinking is needed; it can crash on some models
-            if (wantThinking) {
+            // Use Jinja for thinking-capable models (both to enable and disable thinking)
+            if (session->thinkingSupported) {
                 try {
                     common_chat_templates_inputs inputs;
                     inputs.messages = session->chatMessages;
                     inputs.add_generation_prompt = true;
                     inputs.use_jinja = true;
-                    inputs.enable_thinking = true;
+                    inputs.enable_thinking = wantThinking;
 
                     auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                     formatted_prompt = chat_params.prompt;
-                    thinking_forced_open = chat_params.thinking_forced_open;
+                    thinking_forced_open = wantThinking ? chat_params.thinking_forced_open : false;
                     if (!formatted_prompt.empty()) return true;
                 } catch (...) {
                     // Jinja failed, fall through to non-Jinja path
                 }
             }
 
-            // Non-Jinja path (safe for all models)
+            // Non-Jinja path (for non-thinking models, or Jinja fallback)
             try {
                 common_chat_templates_inputs inputs;
                 inputs.messages = session->chatMessages;
@@ -517,17 +517,18 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
 
     bool templateApplied = false;
     if (session->chatTemplates) {
-        if (wantThinkingMedia) {
+        // Use Jinja for thinking-capable models (both to enable and disable thinking)
+        if (session->thinkingSupported) {
             try {
                 common_chat_templates_inputs inputs;
                 inputs.messages = session->chatMessages;
                 inputs.add_generation_prompt = true;
                 inputs.use_jinja = true;
-                inputs.enable_thinking = true;
+                inputs.enable_thinking = wantThinkingMedia;
 
                 auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                 formatted_prompt = chat_params.prompt;
-                thinking_forced_open = chat_params.thinking_forced_open;
+                thinking_forced_open = wantThinkingMedia ? chat_params.thinking_forced_open : false;
                 if (!formatted_prompt.empty()) templateApplied = true;
             } catch (...) {
                 // Jinja failed, fall through

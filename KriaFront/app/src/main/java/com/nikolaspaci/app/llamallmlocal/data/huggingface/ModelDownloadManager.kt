@@ -1,6 +1,7 @@
 package com.nikolaspaci.app.llamallmlocal.data.huggingface
 
 import android.content.Context
+import com.nikolaspaci.app.llamallmlocal.data.ModelStorageManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -28,6 +29,8 @@ class ModelDownloadManager @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val apiClient: HuggingFaceApiClient
 ) {
+    private val storageManager = ModelStorageManager(context)
+
     companion object {
         private const val PROGRESS_THROTTLE_BYTES = 256 * 1024L // 256KB
     }
@@ -38,8 +41,9 @@ class ModelDownloadManager @Inject constructor(
         val url = apiClient.getDownloadUrl(repoId, filename)
         val request = Request.Builder().url(url).build()
 
-        val tempFile = File(context.cacheDir, "$filename.download")
-        val targetFile = File(context.cacheDir, filename)
+        val modelDir = storageManager.modelDir(filename)
+        val tempFile = File(modelDir, "$filename.download")
+        val targetFile = storageManager.modelFile(filename)
 
         try {
             val response = okHttpClient.newCall(request).execute()

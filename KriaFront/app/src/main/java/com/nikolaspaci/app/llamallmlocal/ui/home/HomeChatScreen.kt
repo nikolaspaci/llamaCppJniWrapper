@@ -20,7 +20,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
@@ -74,7 +76,7 @@ fun HomeChatScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "What are you looking for today?",
+                text = stringResource(R.string.home_title),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )

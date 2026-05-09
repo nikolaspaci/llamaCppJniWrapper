@@ -28,8 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
+import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats
@@ -61,7 +63,7 @@ fun MessageRow(
                     if (message.mediaPath != null) {
                         Image(
                             painter = rememberAsyncImagePainter(Uri.parse(message.mediaPath)),
-                            contentDescription = "Attached image",
+                            contentDescription = stringResource(R.string.chat_attached_image),
                             modifier = Modifier
                                 .size(150.dp)
                                 .clip(RoundedCornerShape(12.dp)),
@@ -112,7 +114,7 @@ fun MessageRow(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.ContentCopy,
-                        contentDescription = "Copy",
+                        contentDescription = stringResource(R.string.common_copy),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
@@ -124,7 +126,7 @@ fun MessageRow(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Refresh,
-                            contentDescription = "Regenerate",
+                            contentDescription = stringResource(R.string.chat_regenerate),
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -135,7 +137,8 @@ fun MessageRow(
             // Stats line
             if (stats != null) {
                 Text(
-                    text = "%.1f tokens/s - %ds - %d tokens".format(
+                    text = stringResource(
+                        R.string.chat_stats_line,
                         stats.tokensPerSecond,
                         stats.durationInSeconds,
                         stats.totalTokens

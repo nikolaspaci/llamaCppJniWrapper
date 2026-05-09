@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class HuggingFaceErrorContext { SEARCH, LOAD_DETAILS, DOWNLOAD }
+
 sealed class HuggingFaceUiState {
     object Initial : HuggingFaceUiState()
     object Searching : HuggingFaceUiState()
@@ -30,7 +32,11 @@ sealed class HuggingFaceUiState {
         val progress: Float
     ) : HuggingFaceUiState()
     data class DownloadComplete(val filePath: String) : HuggingFaceUiState()
-    data class Error(val message: String, val retryAction: (() -> Unit)?) : HuggingFaceUiState()
+    data class Error(
+        val message: String?,
+        val context: HuggingFaceErrorContext,
+        val retryAction: (() -> Unit)?
+    ) : HuggingFaceUiState()
 }
 
 @HiltViewModel
@@ -65,7 +71,8 @@ class HuggingFaceViewModel @Inject constructor(
                 },
                 onFailure = { error ->
                     _uiState.value = HuggingFaceUiState.Error(
-                        message = error.message ?: "Search failed",
+                        message = error.message,
+                        context = HuggingFaceErrorContext.SEARCH,
                         retryAction = { searchModels(query) }
                     )
                 }
@@ -84,7 +91,8 @@ class HuggingFaceViewModel @Inject constructor(
                 },
                 onFailure = { error ->
                     _uiState.value = HuggingFaceUiState.Error(
-                        message = error.message ?: "Failed to load model details",
+                        message = error.message,
+                        context = HuggingFaceErrorContext.LOAD_DETAILS,
                         retryAction = { selectModel(modelId) }
                     )
                 }
@@ -110,6 +118,7 @@ class HuggingFaceViewModel @Inject constructor(
                     is DownloadState.Failed -> {
                         _uiState.value = HuggingFaceUiState.Error(
                             message = state.error,
+                            context = HuggingFaceErrorContext.DOWNLOAD,
                             retryAction = { downloadFile(repoId, filename) }
                         )
                     }
@@ -123,8 +132,12 @@ class HuggingFaceViewModel @Inject constructor(
     }
 
     fun cancelDownload() {
+        val currentState = _uiState.value
         downloadJob?.cancel()
         downloadJob = null
+        if (currentState is HuggingFaceUiState.Downloading) {
+            selectModel(currentState.repoId)
+        }
     }
 
     fun goBackToSearchResults() {
