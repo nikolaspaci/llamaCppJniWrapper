@@ -23,8 +23,8 @@ android {
         applicationId = "com.nikolaspaci.app.llamallmlocal"
         minSdk = 34
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.5.1"
+        versionCode = 10
+        versionName = "1.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -87,6 +87,13 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        // Force AAB / Play to extract native libs to a real on-disk dir so
+        // ggml_backend_load_all_from_path() can scan it. Without this AGP
+        // defaults to uncompressed-in-APK delivery (.apk!/lib/...) and our
+        // C++ filesystem iterator finds zero ggml-cpu variants.
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
     androidResources {

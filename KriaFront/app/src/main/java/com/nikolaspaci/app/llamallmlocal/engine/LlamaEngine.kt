@@ -38,7 +38,7 @@ class LlamaEngine @Inject constructor(
     private var currentSystemPrompt: String = ""
     private var currentLoadParams: LoadTimeParams? = null
     private val mutex = Mutex()
-    private var backendsLoaded = false
+    @Volatile private var backendsLoaded = false
 
     private data class LoadTimeParams(
         val contextSize: Int,
@@ -58,10 +58,70 @@ class LlamaEngine @Inject constructor(
 
     private fun ensureBackendsLoaded() {
         if (!backendsLoaded) {
-            val nativeLibDir = context.applicationInfo.nativeLibraryDir
-            Log.i(TAG, "Loading GGML backends from: $nativeLibDir")
-            LlamaApi.loadBackends(nativeLibDir)
+            val resolution = resolveNativeLibDir()
+            val files = runCatching { File(resolution.path).list()?.toList().orEmpty() }
+                .getOrDefault(emptyList())
+            Log.i(TAG, "Loading GGML backends from: ${resolution.path} (files=${files.size}, source=${resolution.source})")
+            errorLogger.checkpoint("ensureBackendsLoaded.path", mapOf(
+                "nativeLibDir" to resolution.path,
+                "resolutionSource" to resolution.source,
+                "applicationInfoNativeLibDir" to context.applicationInfo.nativeLibraryDir,
+                "findLibraryRaw" to resolution.findLibraryRaw,
+                "exists" to File(resolution.path).exists(),
+                "canRead" to File(resolution.path).canRead(),
+                "fileCount" to files.size,
+                "ggmlCpuFiles" to files.filter { it.startsWith("libggml-cpu") }
+            ))
+            LlamaApi.loadBackends(resolution.path)
             backendsLoaded = true
+        }
+    }
+
+    private data class NativeLibDirResolution(
+        val path: String,
+        val source: String,
+        val findLibraryRaw: String?
+    )
+
+    /**
+     * Returns the on-disk directory that actually contains our packaged
+     * `libggml-cpu-*.so` variants.
+     *
+     * Two install paths to handle:
+     * - Single APK (assembleRelease, adb install): libs are extracted to
+     *   `applicationInfo.nativeLibraryDir`. Default is fine.
+     * - App Bundle / Play Store: AGP defaults to uncompressed-in-APK
+     *   (`extractNativeLibs=false`) and Play often enforces it regardless of
+     *   the manifest. In that case `findLibrary("jniKriaCppWrapper")` returns
+     *   a virtual `.../split_config.<abi>.apk!/lib/<abi>/...` path that the
+     *   C++ `std::filesystem::directory_iterator` cannot traverse. We force
+     *   extraction via `packaging.jniLibs.useLegacyPackaging = true`, but we
+     *   still validate here so a future Play behavior change doesn't silently
+     *   reintroduce the bug.
+     */
+    private fun resolveNativeLibDir(): NativeLibDirResolution {
+        val fallback = context.applicationInfo.nativeLibraryDir
+        var rawLibPath: String? = null
+        return try {
+            val cl = context.classLoader as? dalvik.system.BaseDexClassLoader
+            rawLibPath = cl?.findLibrary("jniKriaCppWrapper")
+            val parent = rawLibPath?.let { File(it).parentFile }
+
+            when {
+                parent == null -> NativeLibDirResolution(fallback, "fallback.findLibraryNull", rawLibPath)
+                // Reject virtual `.apk!/lib/...` paths — std::filesystem can't iterate them.
+                parent.absolutePath.contains(".apk!") ->
+                    NativeLibDirResolution(fallback, "fallback.virtualApkPath", rawLibPath)
+                !parent.isDirectory ->
+                    NativeLibDirResolution(fallback, "fallback.notADirectory", rawLibPath)
+                parent.list()?.any { it.startsWith("libggml-cpu") } != true ->
+                    NativeLibDirResolution(fallback, "fallback.noGgmlCpuFiles", rawLibPath)
+                else ->
+                    NativeLibDirResolution(parent.absolutePath, "classLoader.findLibrary", rawLibPath)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "resolveNativeLibDir fell back to applicationInfo", t)
+            NativeLibDirResolution(fallback, "fallback.exception:${t::class.java.simpleName}", rawLibPath)
         }
     }
 
