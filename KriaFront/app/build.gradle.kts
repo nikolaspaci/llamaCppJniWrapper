@@ -39,6 +39,8 @@ android {
                     "-DGGML_VULKAN=OFF",
                     "-DGGML_BACKEND_DL=ON",
                     "-DGGML_CPU_ALL_VARIANTS=ON",
+                    "-DGGML_CPU_KLEIDIAI=ON",
+                    "-DGGML_OPENMP=OFF",
                     "-DGGML_LLAMAFILE=OFF",
                     "-DGGML_NATIVE=OFF",
                     "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"

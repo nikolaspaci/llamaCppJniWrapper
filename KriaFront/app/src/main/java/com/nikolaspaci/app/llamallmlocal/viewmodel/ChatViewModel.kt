@@ -144,8 +144,6 @@ class ChatViewModel @Inject constructor(
                         _supportsThinking.value = engine.supportsThinking()
                         _hasVision.value = engine.hasVision()
                         updateUiState()
-                        engine.restoreHistory(currentMessages)
-                        triggerPendingPredictionIfNeeded()
                     }
                     is ModelEngine.LoadState.Error -> {
                         _uiState.value = ChatUiState.Error(
@@ -170,7 +168,13 @@ class ChatViewModel @Inject constructor(
             return
         }
         val parameters = parameterProvider.getParametersForConversation(conversationId, path)
-        engine.loadModel(path, parameters)
+        val result = engine.loadModel(path, parameters)
+        if (result.isSuccess) {
+            engine.restoreHistory(currentMessages)
+            _supportsThinking.value = engine.supportsThinking()
+            _hasVision.value = engine.hasVision()
+            triggerPendingPredictionIfNeeded()
+        }
     }
 
     private fun triggerPendingPredictionIfNeeded() {
