@@ -138,6 +138,21 @@
     <!-- Optimization suggestions -->
     <string name="optimization_title">Optimization Suggestions</string>
 
+    <!-- Model management -->
+    <string name="nav_manage_models">Manage models</string>
+    <string name="models_title">Manage models</string>
+    <string name="models_selected_count">%1$d selected</string>
+    <string name="models_clear_selection">Clear selection</string>
+    <string name="models_empty_message">No models in cache. Download or import one to get started.</string>
+    <string name="models_badge_mmproj">vision adapter</string>
+    <string name="models_badge_active">active</string>
+    <string name="models_delete_dialog_title">Delete %1$d model(s)?</string>
+    <string name="models_delete_dialog_message">This will permanently free %1$s from cache. This action cannot be undone.</string>
+    <string name="models_delete_dialog_active_warning">The currently loaded model is in this selection. It will be unloaded automatically.</string>
+    <string name="models_delete_action">Delete</string>
+    <string name="models_deleted_toast">%1$d model(s) deleted, %2$s freed</string>
+    <string name="models_delete_partial_toast">%1$d deleted, %2$d failed</string>
+
     <!-- Hardware info -->
     <string name="hardware_title">Hardware Configuration</string>
     <string name="hardware_cpu">CPU</string>

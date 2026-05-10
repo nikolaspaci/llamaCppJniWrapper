@@ -153,7 +153,7 @@ module.exports = [
     quantization: "Q3_K_M",
     fileSizeBytes: 4623521024,
     tags: ["qwen3.5", "deepseek-distill", "vision", "reasoning", "long-context"],
-    notes: "Qwen 3.5 9B fine-tuned with DeepSeek V4 Flash reasoning distillation. Multimodal (mmproj). 262K context. Heavy: ~5 GB RAM minimum.",
+    notes: "Qwen 3.5 9B fine-tuned with DeepSeek V4 Flash reasoning distillation. Multimodal (mmproj). 262K context. Heavy: ~5 GB RAM minimum. Reasoning always on (chat template hardcodes <think> — thinking toggle has no effect, but reasoning is auto-collapsed in the UI).",
     hasMmproj: true,
     minAppVersionCode: 6,
   },

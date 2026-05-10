@@ -138,6 +138,21 @@
     <!-- Optimization suggestions -->
     <string name="optimization_title">Suggestions d\'optimisation</string>
 
+    <!-- Gestion des modèles -->
+    <string name="nav_manage_models">Gestion des modèles</string>
+    <string name="models_title">Gestion des modèles</string>
+    <string name="models_selected_count">%1$d sélectionné(s)</string>
+    <string name="models_clear_selection">Effacer la sélection</string>
+    <string name="models_empty_message">Aucun modèle en cache. Téléchargez-en un ou importez-en pour commencer.</string>
+    <string name="models_badge_mmproj">adaptateur vision</string>
+    <string name="models_badge_active">actif</string>
+    <string name="models_delete_dialog_title">Supprimer %1$d modèle(s) ?</string>
+    <string name="models_delete_dialog_message">Cela libérera définitivement %1$s du cache. Cette action est irréversible.</string>
+    <string name="models_delete_dialog_active_warning">Le modèle actuellement chargé fait partie de la sélection. Il sera déchargé automatiquement.</string>
+    <string name="models_delete_action">Supprimer</string>
+    <string name="models_deleted_toast">%1$d modèle(s) supprimé(s), %2$s libéré(s)</string>
+    <string name="models_delete_partial_toast">%1$d supprimé(s), %2$d échec(s)</string>
+
     <!-- Hardware info -->
     <string name="hardware_title">Configuration matérielle</string>
     <string name="hardware_cpu">CPU</string>

@@ -18,4 +18,7 @@ interface ModelDao {
 
     @Query("UPDATE models SET defaultParameterId = :paramId WHERE id = :modelId")
     suspend fun updateDefaultParameterId(modelId: Long, paramId: Long?)
+
+    @Query("DELETE FROM models WHERE filePath = :filePath")
+    suspend fun deleteByFilePath(filePath: String)
 }

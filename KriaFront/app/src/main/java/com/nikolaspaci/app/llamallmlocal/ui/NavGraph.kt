@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import com.nikolaspaci.app.llamallmlocal.ui.common.HistoryMenuItems
 import com.nikolaspaci.app.llamallmlocal.ui.common.SearchBar
 import com.nikolaspaci.app.llamallmlocal.ui.home.HomeChatScreen
 import com.nikolaspaci.app.llamallmlocal.ui.huggingface.HuggingFaceScreen
+import com.nikolaspaci.app.llamallmlocal.ui.models.ModelManagementScreen
 import com.nikolaspaci.app.llamallmlocal.ui.settings.SettingsScreen
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryViewModel
@@ -62,6 +64,7 @@ sealed class Screen(val route: String) {
         }
     }
     object HuggingFace : Screen("huggingface")
+    object ModelManagement : Screen("model_management")
 }
 
 @Composable
@@ -96,6 +99,20 @@ fun AppNavigation(factory: ViewModelFactory) {
                         selected = navController.currentDestination?.route == Screen.Home.route,
                         onClick = {
                             navController.navigate(Screen.Home.route)
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                Icons.Rounded.Storage,
+                                contentDescription = null
+                            )
+                        },
+                        label = { Text(stringResource(R.string.nav_manage_models)) },
+                        selected = navController.currentDestination?.route == Screen.ModelManagement.route,
+                        onClick = {
+                            navController.navigate(Screen.ModelManagement.route)
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -211,6 +228,13 @@ fun AppNavigation(factory: ViewModelFactory) {
                         modelFileViewModel.loadCachedModels()
                         navController.popBackStack()
                     }
+                )
+            }
+            composable(Screen.ModelManagement.route) {
+                ModelManagementScreen(
+                    viewModel = hiltViewModel(),
+                    modelFileViewModel = modelFileViewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(

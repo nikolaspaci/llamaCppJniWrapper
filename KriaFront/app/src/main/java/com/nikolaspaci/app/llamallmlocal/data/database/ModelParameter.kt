@@ -19,7 +19,7 @@ data class ModelParameter(
     val useGpu: Boolean = false,
     val gpuLayers: Int = 99,
     val systemPrompt: String = "",
-    val enableThinking: Boolean = true
+    val enableThinking: Boolean = false
 ) {
     companion object {
         // Limites de validation

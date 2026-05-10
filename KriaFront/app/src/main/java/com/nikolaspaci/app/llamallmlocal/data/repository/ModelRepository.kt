@@ -20,4 +20,8 @@ class ModelRepository(private val modelDao: ModelDao) {
     suspend fun updateDefaultParameterId(modelId: Long, paramId: Long?) {
         modelDao.updateDefaultParameterId(modelId, paramId)
     }
+
+    suspend fun deleteByFilePath(filePath: String) {
+        modelDao.deleteByFilePath(filePath)
+    }
 }
