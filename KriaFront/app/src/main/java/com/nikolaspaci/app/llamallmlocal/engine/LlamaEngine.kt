@@ -34,8 +34,25 @@ class LlamaEngine @Inject constructor(
     private var sessionPtr: Long = 0
     private var currentModelPath: String? = null
     private var currentSystemPrompt: String = ""
+    private var currentLoadParams: LoadTimeParams? = null
     private val mutex = Mutex()
     private var backendsLoaded = false
+
+    private data class LoadTimeParams(
+        val contextSize: Int,
+        val threadCount: Int,
+        val useGpu: Boolean,
+        val gpuLayers: Int
+    ) {
+        companion object {
+            fun from(p: ModelParameter) = LoadTimeParams(
+                contextSize = p.contextSize,
+                threadCount = p.threadCount,
+                useGpu = p.useGpu,
+                gpuLayers = p.gpuLayers
+            )
+        }
+    }
 
     private fun ensureBackendsLoaded() {
         if (!backendsLoaded) {
@@ -66,6 +83,16 @@ class LlamaEngine @Inject constructor(
                     Log.w(TAG, "ModelLoadGuard: $warning")
                 }
                 val effectiveParams = preflight.adjustedParameters ?: parameters
+                val newLoadParams = LoadTimeParams.from(effectiveParams)
+
+                if (sessionPtr != 0L &&
+                    currentModelPath == modelPath &&
+                    currentLoadParams == newLoadParams) {
+                    Log.i(TAG, "Reusing already-loaded model: $modelName")
+                    currentSystemPrompt = effectiveParams.systemPrompt
+                    _loadState.value = ModelEngine.LoadState.Loaded(modelName)
+                    return@withLock Result.success(Unit)
+                }
 
                 if (sessionPtr != 0L) {
                     withContext(Dispatchers.IO) {
@@ -73,6 +100,7 @@ class LlamaEngine @Inject constructor(
                     }
                     sessionPtr = 0
                     currentModelPath = null
+                    currentLoadParams = null
                 }
 
                 withContext(Dispatchers.IO) {
@@ -85,6 +113,7 @@ class LlamaEngine @Inject constructor(
                     Result.failure(IllegalStateException("Model loading failed"))
                 } else {
                     currentModelPath = modelPath
+                    currentLoadParams = newLoadParams
                     currentSystemPrompt = effectiveParams.systemPrompt
 
                     // Auto-detect and load multimodal mmproj file
@@ -156,6 +185,7 @@ class LlamaEngine @Inject constructor(
                     }
                     sessionPtr = 0
                     currentModelPath = null
+                    currentLoadParams = null
                 }
                 _loadState.value = ModelEngine.LoadState.Idle
                 Result.success(Unit)

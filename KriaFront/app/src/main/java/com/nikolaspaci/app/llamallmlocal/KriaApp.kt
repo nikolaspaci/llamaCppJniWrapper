@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import com.google.firebase.crashlytics.ktx.crashlytics
 import com.google.firebase.ktx.Firebase
+import com.nikolaspaci.app.llamallmlocal.engine.ModelLifecycleManager
 import com.nikolaspaci.app.llamallmlocal.util.HardwareCapabilities
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -13,10 +14,12 @@ import javax.inject.Inject
 class KriaApp : Application() {
 
     @Inject lateinit var hardwareCapabilities: HardwareCapabilities
+    @Inject lateinit var modelLifecycleManager: ModelLifecycleManager
 
     override fun onCreate() {
         super.onCreate()
         registerDeviceCrashlyticsKeys()
+        modelLifecycleManager.attach()
     }
 
     private fun registerDeviceCrashlyticsKeys() {

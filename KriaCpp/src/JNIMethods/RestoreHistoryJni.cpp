@@ -19,6 +19,11 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_restoreHistory(
 
     session->chatMessages.clear();
 
+    if (session->context) {
+        llama_memory_seq_rm(llama_get_memory(session->context.get()), 0, 0, -1);
+    }
+    session->n_past = 0;
+
     // Inject system prompt as the first message if non-empty
     const char* sp = env->GetStringUTFChars(systemPrompt_j, nullptr);
     std::string systemPromptStr(sp);
