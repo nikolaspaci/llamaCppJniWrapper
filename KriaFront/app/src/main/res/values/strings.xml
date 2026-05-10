@@ -85,6 +85,18 @@
     <string name="hf_search_failed">Search failed</string>
     <string name="hf_load_details_failed">Failed to load model details</string>
 
+    <!-- Curated models -->
+    <string name="hf_recommended_section_title">Recommended models</string>
+    <string name="hf_recommended_section_subtitle">Vetted as compatible with this app</string>
+    <string name="hf_recommended_count">%1$d recommended model(s)</string>
+    <string name="hf_recommended_empty">No recommended model matches these filters.</string>
+    <string name="hf_recommended_loading">Loading recommended models…</string>
+    <string name="hf_filter_params">Parameters</string>
+    <string name="hf_filter_quantization">Quantization</string>
+    <string name="hf_filter_provider">Provider</string>
+    <string name="hf_filter_clear">Clear filters</string>
+    <string name="hf_badge_approved">Approved</string>
+
     <!-- Settings -->
     <string name="settings_title">Model Settings</string>
     <string name="settings_reset">Reset</string>

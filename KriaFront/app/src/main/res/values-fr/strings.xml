@@ -85,6 +85,18 @@
     <string name="hf_search_failed">Échec de la recherche</string>
     <string name="hf_load_details_failed">Échec du chargement des détails du modèle</string>
 
+    <!-- Modèles approuvés -->
+    <string name="hf_recommended_section_title">Modèles recommandés</string>
+    <string name="hf_recommended_section_subtitle">Validés comme compatibles avec l\'application</string>
+    <string name="hf_recommended_count">%1$d modèle(s) recommandé(s)</string>
+    <string name="hf_recommended_empty">Aucun modèle recommandé ne correspond à ces filtres.</string>
+    <string name="hf_recommended_loading">Chargement des modèles recommandés…</string>
+    <string name="hf_filter_params">Paramètres</string>
+    <string name="hf_filter_quantization">Quantization</string>
+    <string name="hf_filter_provider">Fournisseur</string>
+    <string name="hf_filter_clear">Effacer les filtres</string>
+    <string name="hf_badge_approved">Approuvé</string>
+
     <!-- Settings -->
     <string name="settings_title">Paramètres du modèle</string>
     <string name="settings_reset">Réinitialiser</string>

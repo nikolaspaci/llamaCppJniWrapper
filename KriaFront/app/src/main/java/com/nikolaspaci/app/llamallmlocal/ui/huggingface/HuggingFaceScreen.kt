@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,10 +41,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.R
-import com.nikolaspaci.app.llamallmlocal.data.huggingface.HfModel
+import com.nikolaspaci.app.llamallmlocal.data.curated.CuratedFacets
+import com.nikolaspaci.app.llamallmlocal.data.curated.CuratedFilter
 import com.nikolaspaci.app.llamallmlocal.data.huggingface.HfModelDetail
 import com.nikolaspaci.app.llamallmlocal.data.huggingface.HfSibling
 import com.nikolaspaci.app.llamallmlocal.ui.common.SearchBar
+import com.nikolaspaci.app.llamallmlocal.viewmodel.AnnotatedHfModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceErrorContext
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceViewModel
@@ -57,8 +60,12 @@ fun HuggingFaceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val curatedFilter by viewModel.curatedFilter.collectAsState()
+    val filteredCurated by viewModel.filteredCuratedModels.collectAsState()
+    val filteredSearchResults by viewModel.filteredSearchResults.collectAsState()
+    val curatedFacets by viewModel.curatedFacets.collectAsState()
+    val searchInFlight by viewModel.searchInFlight.collectAsState()
 
-    // Auto-navigate back on download complete
     LaunchedEffect(uiState) {
         if (uiState is HuggingFaceUiState.DownloadComplete) {
             onModelDownloaded((uiState as HuggingFaceUiState.DownloadComplete).filePath)
@@ -78,37 +85,73 @@ fun HuggingFaceScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            when (val state = uiState) {
-                is HuggingFaceUiState.Initial -> {
-                    SearchContent(
+            val state = uiState
+            when {
+                state is HuggingFaceUiState.Initial -> {
+                    BrowseContent(
                         query = searchQuery,
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onSearch = { viewModel.searchModels() }
-                    )
-                }
-                is HuggingFaceUiState.Searching -> {
-                    SearchingContent(query = searchQuery)
-                }
-                is HuggingFaceUiState.SearchResults -> {
-                    SearchResultsContent(
-                        query = searchQuery,
-                        models = state.models,
                         onQueryChange = viewModel::updateSearchQuery,
                         onSearch = { viewModel.searchModels() },
-                        onModelClick = { viewModel.selectModel(it.id) }
-                    )
+                        curatedFilter = curatedFilter,
+                        curatedFacets = curatedFacets,
+                        onCuratedFilterChange = viewModel::updateCuratedFilter,
+                        onCuratedClear = viewModel::clearCuratedFilter,
+                        searchInFlight = searchInFlight
+                    ) {
+                        curatedModelSection(
+                            models = filteredCurated,
+                            onModelClick = viewModel::selectCuratedModel
+                        )
+                    }
                 }
-                is HuggingFaceUiState.LoadingFiles -> {
+                state is HuggingFaceUiState.SearchResults -> {
+                    BrowseContent(
+                        query = searchQuery,
+                        onQueryChange = viewModel::updateSearchQuery,
+                        onSearch = { viewModel.searchModels() },
+                        curatedFilter = curatedFilter,
+                        curatedFacets = curatedFacets,
+                        onCuratedFilterChange = viewModel::updateCuratedFilter,
+                        onCuratedClear = viewModel::clearCuratedFilter,
+                        searchInFlight = searchInFlight
+                    ) {
+                        searchResultsSection(
+                            models = filteredSearchResults,
+                            onModelClick = { viewModel.selectModel(it.model.id) }
+                        )
+                    }
+                }
+                state is HuggingFaceUiState.Error && state.context == HuggingFaceErrorContext.SEARCH -> {
+                    val errorMessage = state.message ?: stringResource(R.string.hf_search_failed)
+                    BrowseContent(
+                        query = searchQuery,
+                        onQueryChange = viewModel::updateSearchQuery,
+                        onSearch = { viewModel.searchModels() },
+                        curatedFilter = curatedFilter,
+                        curatedFacets = curatedFacets,
+                        onCuratedFilterChange = viewModel::updateCuratedFilter,
+                        onCuratedClear = viewModel::clearCuratedFilter,
+                        searchInFlight = searchInFlight
+                    ) {
+                        inlineSearchErrorItem(
+                            message = errorMessage,
+                            onRetry = state.retryAction
+                        )
+                    }
+                }
+                state is HuggingFaceUiState.LoadingFiles -> {
                     LoadingFilesContent(modelId = state.modelId)
                 }
-                is HuggingFaceUiState.ModelFiles -> {
+                state is HuggingFaceUiState.ModelFiles -> {
                     ModelFilesContent(
                         detail = state.detail,
+                        approvedFilenames = state.approvedFilenames,
+                        preselectedFilename = state.preselectedFilename,
                         onDownload = { file -> viewModel.downloadFile(state.detail.id, file.rfilename) },
                         onBack = { viewModel.goBackToSearchResults() }
                     )
                 }
-                is HuggingFaceUiState.Downloading -> {
+                state is HuggingFaceUiState.Downloading -> {
                     DownloadingContent(
                         filename = state.filename,
                         bytesDownloaded = state.bytesDownloaded,
@@ -117,10 +160,10 @@ fun HuggingFaceScreen(
                         onCancel = { viewModel.cancelDownload() }
                     )
                 }
-                is HuggingFaceUiState.DownloadComplete -> {
+                state is HuggingFaceUiState.DownloadComplete -> {
                     DownloadCompleteContent()
                 }
-                is HuggingFaceUiState.Error -> {
+                state is HuggingFaceUiState.Error -> {
                     val displayMessage = state.message ?: stringResource(
                         when (state.context) {
                             HuggingFaceErrorContext.SEARCH -> R.string.hf_search_failed
@@ -139,53 +182,21 @@ fun HuggingFaceScreen(
     }
 }
 
+/**
+ * Shared layout for the Initial and SearchResults states. The header (search bar + chip filters)
+ * is always visible at the top; the body LazyColumn renders whatever section the caller provides.
+ */
 @Composable
-private fun SearchContent(
+private fun BrowseContent(
     query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = stringResource(R.string.hf_search_title),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        SearchBar(
-            query = query,
-            onQueryChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = stringResource(R.string.hf_search_placeholder),
-            onSearch = onSearch
-        )
-    }
-}
-
-
-@Composable
-private fun SearchingContent(query: String) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CircularProgressIndicator()
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(stringResource(R.string.hf_searching_for, query))
-    }
-}
-
-@Composable
-private fun SearchResultsContent(
-    query: String,
-    models: List<HfModel>,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onModelClick: (HfModel) -> Unit
+    curatedFilter: CuratedFilter,
+    curatedFacets: CuratedFacets,
+    onCuratedFilterChange: ((CuratedFilter) -> CuratedFilter) -> Unit,
+    onCuratedClear: () -> Unit,
+    searchInFlight: Boolean,
+    body: LazyListScope.() -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         SearchBar(
@@ -195,42 +206,121 @@ private fun SearchResultsContent(
             placeholder = stringResource(R.string.hf_search_placeholder),
             onSearch = onSearch
         )
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (models.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.hf_no_models_found))
+        Spacer(Modifier.height(12.dp))
+        CuratedFiltersBar(
+            filter = curatedFilter,
+            facets = curatedFacets,
+            onFilterChange = onCuratedFilterChange,
+            onClear = onCuratedClear
+        )
+        Spacer(Modifier.height(8.dp))
+        // Thin in-flight indicator under the chips. Always reserve the slot so the
+        // body below never shifts when the bar appears/disappears between debounced searches.
+        Box(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+            if (searchInFlight) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-        } else {
-            Text(
-                text = stringResource(R.string.hf_models_found, models.size),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(models) { model ->
-                    ModelCard(model = model, onClick = { onModelClick(model) })
+        }
+        Spacer(Modifier.height(8.dp))
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            body()
+        }
+    }
+}
+
+private fun LazyListScope.inlineSearchErrorItem(
+    message: String,
+    onRetry: (() -> Unit)?
+) {
+    item(key = "inline_search_error") {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                if (onRetry != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = onRetry) {
+                            Text(stringResource(R.string.common_retry))
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+fun LazyListScope.searchResultsSection(
+    models: List<AnnotatedHfModel>,
+    onModelClick: (AnnotatedHfModel) -> Unit
+) {
+    if (models.isEmpty()) {
+        item(key = "search_results_empty") {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(stringResource(R.string.hf_no_models_found))
+            }
+        }
+    } else {
+        item(key = "search_results_count") {
+            Text(
+                text = stringResource(R.string.hf_models_found, models.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        items(models, key = { it.model.id }) { item ->
+            ModelCard(item = item, onClick = { onModelClick(item) })
+        }
+    }
+}
+
 @Composable
-private fun ModelCard(model: HfModel, onClick: () -> Unit) {
+private fun ModelCard(item: AnnotatedHfModel, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = model.id,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            model.author?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.model.id,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (item.isApproved) {
+                    Spacer(Modifier.width(8.dp))
+                    ApprovedBadge()
+                }
+            }
+            item.curatedNotes?.takeIf { it.isNotBlank() }?.let { notes ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = notes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            item.model.author?.let {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.hf_by_author, it),
                     style = MaterialTheme.typography.bodySmall,
@@ -239,7 +329,7 @@ private fun ModelCard(model: HfModel, onClick: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = stringResource(R.string.hf_downloads_count, formatDownloads(model.downloads)),
+                text = stringResource(R.string.hf_downloads_count, formatDownloads(item.model.downloads)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -263,6 +353,8 @@ private fun LoadingFilesContent(modelId: String) {
 @Composable
 private fun ModelFilesContent(
     detail: HfModelDetail,
+    approvedFilenames: Set<String>,
+    preselectedFilename: String?,
     onDownload: (HfSibling) -> Unit,
     onBack: () -> Unit
 ) {
@@ -293,9 +385,19 @@ private fun ModelFilesContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
+            val sortedFiles = ggufFiles.sortedWith(
+                compareByDescending<HfSibling> { it.rfilename == preselectedFilename }
+                    .thenByDescending { it.rfilename in approvedFilenames }
+                    .thenBy { it.rfilename }
+            )
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(ggufFiles) { file ->
-                    FileCard(file = file, onDownload = { onDownload(file) })
+                items(sortedFiles) { file ->
+                    FileCard(
+                        file = file,
+                        isApproved = file.rfilename in approvedFilenames,
+                        isPreselected = file.rfilename == preselectedFilename,
+                        onDownload = { onDownload(file) }
+                    )
                 }
             }
         }
@@ -303,10 +405,17 @@ private fun ModelFilesContent(
 }
 
 @Composable
-private fun FileCard(file: HfSibling, onDownload: () -> Unit) {
+private fun FileCard(
+    file: HfSibling,
+    isApproved: Boolean,
+    isPreselected: Boolean,
+    onDownload: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isPreselected) 4.dp else 1.dp
+        )
     ) {
         Row(
             modifier = Modifier.padding(12.dp).fillMaxWidth(),
@@ -314,12 +423,19 @@ private fun FileCard(file: HfSibling, onDownload: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = file.rfilename,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = file.rfilename,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isApproved) {
+                        Spacer(Modifier.width(8.dp))
+                        ApprovedBadge()
+                    }
+                }
                 file.size?.let { size ->
                     Text(
                         text = formatFileSize(size),
@@ -442,7 +558,7 @@ private fun ErrorContent(
     }
 }
 
-private fun formatFileSize(bytes: Long): String {
+internal fun formatFileSize(bytes: Long): String {
     return when {
         bytes < 1024 -> "$bytes B"
         bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)

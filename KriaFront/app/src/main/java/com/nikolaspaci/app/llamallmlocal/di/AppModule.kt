@@ -15,8 +15,14 @@ import com.nikolaspaci.app.llamallmlocal.engine.DefaultModelParameterProvider
 import com.nikolaspaci.app.llamallmlocal.engine.LlamaEngine
 import com.nikolaspaci.app.llamallmlocal.engine.ModelEngine
 import com.nikolaspaci.app.llamallmlocal.engine.ModelParameterProvider
+import com.nikolaspaci.app.llamallmlocal.data.curated.AppVersionCode
 import com.nikolaspaci.app.llamallmlocal.util.HardwareCapabilities
 import com.nikolaspaci.app.llamallmlocal.util.OptimalConfigurationService
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.firestoreSettings
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.firestore.persistentCacheSettings
+import com.google.firebase.ktx.Firebase
 import com.google.gson.Gson
 import dagger.Binds
 import dagger.Module
@@ -116,6 +122,23 @@ object AppModule {
     @Singleton
     fun provideGson(): Gson {
         return Gson()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseFirestore(): FirebaseFirestore {
+        return Firebase.firestore.apply {
+            firestoreSettings = firestoreSettings {
+                setLocalCacheSettings(persistentCacheSettings { })
+            }
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideAppVersionCode(@ApplicationContext context: Context): AppVersionCode {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return AppVersionCode(info.longVersionCode)
     }
 }
 
