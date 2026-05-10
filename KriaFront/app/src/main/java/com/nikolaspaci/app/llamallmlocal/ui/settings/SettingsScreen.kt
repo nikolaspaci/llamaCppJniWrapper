@@ -34,7 +34,7 @@ fun SettingsScreen(
     conversationId: Long? = null,
     modelFileViewModel: ModelFileViewModel,
     onModelChanged: (String) -> Unit,
-    onNavigateToHuggingFace: () -> Unit,
+    onNavigateToManageModels: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -82,7 +82,7 @@ fun SettingsScreen(
                             viewModel.loadParameters(newPath)
                         }
                     },
-                    onDownloadFromHuggingFace = onNavigateToHuggingFace,
+                    onNavigateToManageModels = onNavigateToManageModels,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

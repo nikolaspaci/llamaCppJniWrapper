@@ -38,7 +38,7 @@ fun HomeChatScreen(
     modelFileViewModel: ModelFileViewModel,
     onStartChat: (Long) -> Unit,
     onOpenDrawer: () -> Unit,
-    onNavigateToHuggingFace: () -> Unit = {},
+    onNavigateToManageModels: () -> Unit = {},
     onNavigateToSettings: ((String) -> Unit)? = null,
     updatedModelPath: String? = null
 ) {
@@ -103,7 +103,7 @@ fun HomeChatScreen(
                     selectedModelPath = it
                     modelFileViewModel.saveModelPath(it)
                 },
-                onDownloadFromHuggingFace = onNavigateToHuggingFace,
+                onNavigateToManageModels = onNavigateToManageModels,
                 modifier = Modifier.fillMaxWidth()
             )
         }

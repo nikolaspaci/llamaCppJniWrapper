@@ -55,9 +55,7 @@
 
     <!-- Model selector -->
     <string name="model_selector_select">Sélectionner un modèle</string>
-    <string name="model_selector_browse_new">Parcourir un nouveau modèle…</string>
-    <string name="model_selector_import_vision">Importer un adaptateur vision (mmproj)…</string>
-    <string name="model_selector_download_hf">Télécharger depuis Hugging Face…</string>
+    <string name="model_selector_add_model">Ajouter un modèle…</string>
     <string name="model_selector_missing">Plus présent en mémoire</string>
 
     <!-- Model selection dialog -->
@@ -152,6 +150,15 @@
     <string name="models_delete_action">Supprimer</string>
     <string name="models_deleted_toast">%1$d modèle(s) supprimé(s), %2$s libéré(s)</string>
     <string name="models_delete_partial_toast">%1$d supprimé(s), %2$d échec(s)</string>
+    <string name="models_section_add">Ajouter un modèle</string>
+    <string name="models_section_cached">Modèles en cache</string>
+    <string name="models_action_browse_local">Parcourir un nouveau modèle…</string>
+    <string name="models_action_import_mmproj">Importer un adaptateur vision (mmproj)…</string>
+    <string name="models_action_download_hf">Télécharger depuis Hugging Face…</string>
+    <string name="models_mmproj_dialog_title">Choisir le modèle de base</string>
+    <string name="models_mmproj_dialog_desc">L\'adaptateur vision sera enregistré à côté du modèle sélectionné.</string>
+    <string name="models_mmproj_dialog_empty">Aucun modèle de base en cache. Téléchargez ou importez un .gguf d\'abord.</string>
+    <string name="models_mmproj_dialog_continue">Continuer</string>
 
     <!-- Hardware info -->
     <string name="hardware_title">Configuration matérielle</string>

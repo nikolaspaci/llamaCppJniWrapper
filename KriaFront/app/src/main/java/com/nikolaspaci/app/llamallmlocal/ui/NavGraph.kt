@@ -177,8 +177,8 @@ fun AppNavigation(factory: ViewModelFactory) {
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
                     },
-                    onNavigateToHuggingFace = {
-                        navController.navigate(Screen.HuggingFace.route)
+                    onNavigateToManageModels = {
+                        navController.navigate(Screen.ModelManagement.route)
                     },
                     onNavigateToSettings = { modelId ->
                         navController.navigate(Screen.Settings.createRoute(modelId))
@@ -234,7 +234,8 @@ fun AppNavigation(factory: ViewModelFactory) {
                 ModelManagementScreen(
                     viewModel = hiltViewModel(),
                     modelFileViewModel = modelFileViewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToHuggingFace = { navController.navigate(Screen.HuggingFace.route) }
                 )
             }
             composable(
@@ -256,8 +257,8 @@ fun AppNavigation(factory: ViewModelFactory) {
                     onModelChanged = { newPath ->
                         navController.previousBackStackEntry?.savedStateHandle?.set("selected_model_path", newPath)
                     },
-                    onNavigateToHuggingFace = {
-                        navController.navigate(Screen.HuggingFace.route)
+                    onNavigateToManageModels = {
+                        navController.navigate(Screen.ModelManagement.route)
                     },
                     onNavigateBack = { navController.popBackStack() }
                 )

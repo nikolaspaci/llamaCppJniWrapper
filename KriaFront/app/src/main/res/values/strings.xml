@@ -55,9 +55,7 @@
 
     <!-- Model selector -->
     <string name="model_selector_select">Select a Model</string>
-    <string name="model_selector_browse_new">Browse for new model…</string>
-    <string name="model_selector_import_vision">Import vision adapter (mmproj)…</string>
-    <string name="model_selector_download_hf">Download from Hugging Face…</string>
+    <string name="model_selector_add_model">Add a model…</string>
     <string name="model_selector_missing">No longer in memory</string>
 
     <!-- Model selection dialog -->
@@ -152,6 +150,15 @@
     <string name="models_delete_action">Delete</string>
     <string name="models_deleted_toast">%1$d model(s) deleted, %2$s freed</string>
     <string name="models_delete_partial_toast">%1$d deleted, %2$d failed</string>
+    <string name="models_section_add">Add a model</string>
+    <string name="models_section_cached">Cached models</string>
+    <string name="models_action_browse_local">Browse for new model…</string>
+    <string name="models_action_import_mmproj">Import vision adapter (mmproj)…</string>
+    <string name="models_action_download_hf">Download from Hugging Face…</string>
+    <string name="models_mmproj_dialog_title">Choose target base model</string>
+    <string name="models_mmproj_dialog_desc">The vision adapter will be saved next to the selected model.</string>
+    <string name="models_mmproj_dialog_empty">No base model in cache. Download or import a .gguf first.</string>
+    <string name="models_mmproj_dialog_continue">Continue</string>
 
     <!-- Hardware info -->
     <string name="hardware_title">Hardware Configuration</string>
