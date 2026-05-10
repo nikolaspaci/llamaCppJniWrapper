@@ -8,6 +8,7 @@ import com.nikolaspaci.app.llamallmlocal.LlamaApi
 import kotlinx.coroutines.CancellationException
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,6 +17,10 @@ class RemoteErrorLogger @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val crashlytics: FirebaseCrashlytics
 ) {
+
+    // Stable across the process lifetime so checkpoints from the same hung
+    // session can be grouped together when reading Firestore.
+    private val sessionId: String = UUID.randomUUID().toString()
 
     fun log(source: String, throwable: Throwable, extras: Map<String, Any?> = emptyMap()) {
         if (throwable is CancellationException) return
@@ -32,6 +37,7 @@ class RemoteErrorLogger @Inject constructor(
         }
 
         val payload = mutableMapOf<String, Any?>(
+            "sessionId" to sessionId,
             "source" to source,
             "message" to (throwable.message ?: throwable::class.java.simpleName),
             "exceptionClass" to throwable::class.java.name,
@@ -48,16 +54,42 @@ class RemoteErrorLogger @Inject constructor(
         )
         payload.putAll(extras)
 
-        runCatching {
-            firestore.collection(COLLECTION)
+        try {
+            firestore.collection(ERRORS_COLLECTION)
                 .add(payload)
                 .addOnSuccessListener { ref -> Log.i(TAG, "Firestore error written: ${ref.id}") }
                 .addOnFailureListener { e -> Log.w(TAG, "Firestore log failed", e) }
-        }.onFailure { Log.w(TAG, "Firestore submit threw", it) }
+        } catch (t: Throwable) { Log.w(TAG, "Firestore submit threw", t) }
+    }
+
+    /**
+     * Lightweight breadcrumb written to a separate collection. Use this around
+     * suspect-hang code paths so a stuck session leaves a trail of completed
+     * milestones; the absence of the next checkpoint pinpoints where it stalled.
+     * No native log tail / no stack trace — keep it cheap.
+     */
+    fun checkpoint(name: String, extras: Map<String, Any?> = emptyMap()) {
+        Log.d(TAG, "checkpoint: $name $extras")
+        val payload = mutableMapOf<String, Any?>(
+            "sessionId" to sessionId,
+            "name" to name,
+            "deviceModel" to Build.MODEL,
+            "soc" to runCatching { Build.SOC_MODEL }.getOrNull(),
+            "androidSdk" to Build.VERSION.SDK_INT,
+            "abi" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"),
+            "timestamp" to System.currentTimeMillis()
+        )
+        payload.putAll(extras)
+        try {
+            firestore.collection(CHECKPOINTS_COLLECTION)
+                .add(payload)
+                .addOnFailureListener { e -> Log.w(TAG, "checkpoint $name failed", e) }
+        } catch (t: Throwable) { Log.w(TAG, "checkpoint submit threw", t) }
     }
 
     companion object {
         private const val TAG = "RemoteErrorLogger"
-        private const val COLLECTION = "client_errors"
+        private const val ERRORS_COLLECTION = "client_errors"
+        private const val CHECKPOINTS_COLLECTION = "client_checkpoints"
     }
 }

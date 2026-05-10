@@ -11,6 +11,7 @@ import com.nikolaspaci.app.llamallmlocal.engine.ModelEngine
 import com.nikolaspaci.app.llamallmlocal.engine.ModelParameterProvider
 import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
 import com.nikolaspaci.app.llamallmlocal.usecase.PredictUseCase
+import com.nikolaspaci.app.llamallmlocal.util.RemoteErrorLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,7 @@ class ChatViewModel @Inject constructor(
     private val engine: ModelEngine,
     private val predictUseCase: PredictUseCase,
     private val parameterProvider: ModelParameterProvider,
+    private val errorLogger: RemoteErrorLogger,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -146,6 +148,11 @@ class ChatViewModel @Inject constructor(
                         updateUiState()
                     }
                     is ModelEngine.LoadState.Error -> {
+                        errorLogger.checkpoint("ChatVM.LoadState.Error", mapOf(
+                            "conversationId" to conversationId,
+                            "modelPath" to (_modelPath.value ?: ""),
+                            "message" to state.message
+                        ))
                         _uiState.value = ChatUiState.Error(
                             errorType = ChatErrorType.Generic(state.message),
                             previousMessages = currentMessages,
@@ -159,7 +166,15 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun loadModel(path: String) {
+        errorLogger.checkpoint("ChatVM.loadModel.start", mapOf(
+            "conversationId" to conversationId,
+            "modelPath" to path,
+            "fileExists" to (path.isNotBlank() && File(path).exists())
+        ))
         if (path.isBlank() || !File(path).exists()) {
+            errorLogger.log("ChatVM.loadModel.missingFile",
+                IllegalStateException("Model file missing or path blank"),
+                mapOf("path" to path))
             _uiState.value = ChatUiState.Error(
                 errorType = ChatErrorType.ModelUnavailable,
                 previousMessages = currentMessages,
@@ -170,10 +185,16 @@ class ChatViewModel @Inject constructor(
         val parameters = parameterProvider.getParametersForConversation(conversationId, path)
         val result = engine.loadModel(path, parameters)
         if (result.isSuccess) {
+            errorLogger.checkpoint("ChatVM.loadModel.engineSuccess")
             engine.restoreHistory(currentMessages)
+            errorLogger.checkpoint("ChatVM.restoreHistory.done",
+                mapOf("messageCount" to currentMessages.size))
             _supportsThinking.value = engine.supportsThinking()
             _hasVision.value = engine.hasVision()
             triggerPendingPredictionIfNeeded()
+        } else {
+            errorLogger.checkpoint("ChatVM.loadModel.engineFailure",
+                mapOf("error" to (result.exceptionOrNull()?.message ?: "unknown")))
         }
     }
 
@@ -256,6 +277,10 @@ class ChatViewModel @Inject constructor(
 
             predictUseCase(prompt, _modelPath.value ?: "", conversationId, imageData)
                 .catch { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    errorLogger.log("ChatVM.startPrediction",
+                        e,
+                        mapOf("conversationId" to conversationId, "promptLength" to prompt.length))
                     val msg = e.message
                     _uiState.value = ChatUiState.Error(
                         errorType = if (msg.isNullOrBlank()) ChatErrorType.PredictionFailed else ChatErrorType.Generic(msg),

@@ -9,6 +9,7 @@ import com.nikolaspaci.app.llamallmlocal.PredictCallback
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
 import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
+import com.nikolaspaci.app.llamallmlocal.util.RemoteErrorLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -28,7 +29,8 @@ import javax.inject.Singleton
 @Singleton
 class LlamaEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val modelLoadGuard: ModelLoadGuard
+    private val modelLoadGuard: ModelLoadGuard,
+    private val errorLogger: RemoteErrorLogger
 ) : ModelEngine {
 
     private var sessionPtr: Long = 0
@@ -67,6 +69,16 @@ class LlamaEngine @Inject constructor(
     override val loadState: StateFlow<ModelEngine.LoadState> = _loadState.asStateFlow()
 
     override suspend fun loadModel(modelPath: String, parameters: ModelParameter): Result<Unit> {
+        val modelFileName = File(modelPath).name
+        val modelSizeBytes = runCatching { File(modelPath).length() }.getOrDefault(-1L)
+        errorLogger.checkpoint("loadModel.start", mapOf(
+            "modelFile" to modelFileName,
+            "modelSizeBytes" to modelSizeBytes,
+            "contextSize" to parameters.contextSize,
+            "threadCount" to parameters.threadCount,
+            "useGpu" to parameters.useGpu,
+            "gpuLayers" to parameters.gpuLayers
+        ))
         return mutex.withLock {
             try {
                 val modelName = File(modelPath).nameWithoutExtension
@@ -74,9 +86,18 @@ class LlamaEngine @Inject constructor(
 
                 // Pre-flight check
                 val preflight = modelLoadGuard.check(modelPath, parameters)
+                errorLogger.checkpoint("loadModel.preflight", mapOf(
+                    "canLoad" to preflight.canLoad,
+                    "error" to preflight.error,
+                    "warnings" to preflight.warnings.joinToString("; ").take(500),
+                    "adjusted" to (preflight.adjustedParameters != null)
+                ))
                 if (!preflight.canLoad) {
                     val error = preflight.error ?: "Pre-flight check failed"
                     _loadState.value = ModelEngine.LoadState.Error(error)
+                    errorLogger.log("LlamaEngine.loadModel.preflight",
+                        IllegalStateException(error),
+                        mapOf("modelFile" to modelFileName))
                     return@withLock Result.failure(IllegalStateException(error))
                 }
                 for (warning in preflight.warnings) {
@@ -91,10 +112,12 @@ class LlamaEngine @Inject constructor(
                     Log.i(TAG, "Reusing already-loaded model: $modelName")
                     currentSystemPrompt = effectiveParams.systemPrompt
                     _loadState.value = ModelEngine.LoadState.Loaded(modelName)
+                    errorLogger.checkpoint("loadModel.reused", mapOf("modelFile" to modelFileName))
                     return@withLock Result.success(Unit)
                 }
 
                 if (sessionPtr != 0L) {
+                    errorLogger.checkpoint("loadModel.freeingPrevious")
                     withContext(Dispatchers.IO) {
                         LlamaApi.free(sessionPtr)
                     }
@@ -104,12 +127,26 @@ class LlamaEngine @Inject constructor(
                 }
 
                 withContext(Dispatchers.IO) {
+                    errorLogger.checkpoint("loadModel.ensureBackends.start",
+                        mapOf("backendsAlreadyLoaded" to backendsLoaded))
                     ensureBackendsLoaded()
+                    errorLogger.checkpoint("loadModel.ensureBackends.done")
+
+                    errorLogger.checkpoint("loadModel.llamaInit.start", mapOf(
+                        "modelFile" to modelFileName,
+                        "contextSize" to effectiveParams.contextSize,
+                        "threadCount" to effectiveParams.threadCount
+                    ))
                     sessionPtr = LlamaApi.init(modelPath, effectiveParams)
+                    errorLogger.checkpoint("loadModel.llamaInit.done",
+                        mapOf("sessionOk" to (sessionPtr != 0L)))
                 }
 
                 if (sessionPtr == 0L) {
                     _loadState.value = ModelEngine.LoadState.Error("Echec du chargement du modele")
+                    errorLogger.log("LlamaEngine.loadModel.llamaInit",
+                        IllegalStateException("LlamaApi.init returned 0"),
+                        mapOf("modelFile" to modelFileName))
                     Result.failure(IllegalStateException("Model loading failed"))
                 } else {
                     currentModelPath = modelPath
@@ -121,11 +158,14 @@ class LlamaEngine @Inject constructor(
 
                     _loadState.value = ModelEngine.LoadState.Loaded(modelName)
                     setCrashlyticsModelKeys(modelName, effectiveParams)
+                    errorLogger.checkpoint("loadModel.success", mapOf("modelFile" to modelFileName))
                     Result.success(Unit)
                 }
             } catch (e: Exception) {
                 _loadState.value = ModelEngine.LoadState.Error(e.message ?: "Erreur inconnue")
-                Firebase.crashlytics.recordException(e)
+                errorLogger.log("LlamaEngine.loadModel",
+                    e,
+                    mapOf("modelFile" to modelFileName, "modelSizeBytes" to modelSizeBytes))
                 Result.failure(e)
             }
         }
@@ -202,28 +242,51 @@ class LlamaEngine @Inject constructor(
     }
 
     override fun predict(prompt: String, parameters: ModelParameter, enableThinking: Boolean): Flow<PredictionEvent> = callbackFlow {
+        errorLogger.checkpoint("predict.start", mapOf(
+            "promptLength" to prompt.length,
+            "enableThinking" to enableThinking,
+            "sessionOk" to (sessionPtr != 0L)
+        ))
         if (sessionPtr == 0L) {
+            errorLogger.log("LlamaEngine.predict",
+                IllegalStateException("Aucun modele charge"),
+                mapOf("promptLength" to prompt.length))
             trySend(PredictionEvent.Error("Aucun modele charge", isRecoverable = false))
             close()
             return@callbackFlow
         }
 
+        var firstTokenSent = false
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
+                if (!firstTokenSent) {
+                    firstTokenSent = true
+                    errorLogger.checkpoint("predict.firstToken")
+                }
                 trySend(PredictionEvent.Token(token))
             }
 
             override fun onThinkingToken(token: String) {
+                if (!firstTokenSent) {
+                    firstTokenSent = true
+                    errorLogger.checkpoint("predict.firstToken", mapOf("thinking" to true))
+                }
                 trySend(PredictionEvent.ThinkingToken(token))
             }
 
             override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
+                errorLogger.checkpoint("predict.complete", mapOf(
+                    "tokensPerSecond" to tokensPerSecond,
+                    "durationInSeconds" to durationInSeconds
+                ))
                 trySend(PredictionEvent.Completion(tokensPerSecond, durationInSeconds))
                 close()
             }
 
             override fun onError(error: String) {
-                Firebase.crashlytics.recordException(RuntimeException("Prediction error: $error"))
+                errorLogger.log("LlamaEngine.predict.callback",
+                    RuntimeException("Prediction error: $error"),
+                    mapOf("promptLength" to prompt.length))
                 trySend(PredictionEvent.Error(error, isRecoverable = true))
                 close()
             }
@@ -235,28 +298,53 @@ class LlamaEngine @Inject constructor(
     }.flowOn(Dispatchers.IO)
 
     override fun predictWithMedia(prompt: String, imageData: ByteArray?, parameters: ModelParameter, enableThinking: Boolean): Flow<PredictionEvent> = callbackFlow {
+        errorLogger.checkpoint("predictWithMedia.start", mapOf(
+            "promptLength" to prompt.length,
+            "hasImage" to (imageData != null),
+            "imageBytes" to (imageData?.size ?: 0),
+            "enableThinking" to enableThinking,
+            "sessionOk" to (sessionPtr != 0L)
+        ))
         if (sessionPtr == 0L) {
+            errorLogger.log("LlamaEngine.predictWithMedia",
+                IllegalStateException("Aucun modele charge"),
+                mapOf("promptLength" to prompt.length))
             trySend(PredictionEvent.Error("Aucun modele charge", isRecoverable = false))
             close()
             return@callbackFlow
         }
 
+        var firstTokenSent = false
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
+                if (!firstTokenSent) {
+                    firstTokenSent = true
+                    errorLogger.checkpoint("predictWithMedia.firstToken")
+                }
                 trySend(PredictionEvent.Token(token))
             }
 
             override fun onThinkingToken(token: String) {
+                if (!firstTokenSent) {
+                    firstTokenSent = true
+                    errorLogger.checkpoint("predictWithMedia.firstToken", mapOf("thinking" to true))
+                }
                 trySend(PredictionEvent.ThinkingToken(token))
             }
 
             override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
+                errorLogger.checkpoint("predictWithMedia.complete", mapOf(
+                    "tokensPerSecond" to tokensPerSecond,
+                    "durationInSeconds" to durationInSeconds
+                ))
                 trySend(PredictionEvent.Completion(tokensPerSecond, durationInSeconds))
                 close()
             }
 
             override fun onError(error: String) {
-                Firebase.crashlytics.recordException(RuntimeException("Prediction error: $error"))
+                errorLogger.log("LlamaEngine.predictWithMedia.callback",
+                    RuntimeException("Prediction error: $error"),
+                    mapOf("promptLength" to prompt.length))
                 trySend(PredictionEvent.Error(error, isRecoverable = true))
                 close()
             }
