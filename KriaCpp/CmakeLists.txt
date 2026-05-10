@@ -82,7 +82,7 @@ if(ANDROID)
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs/${ANDROID_ABI}"
     )
 
-    target_link_libraries(jniKriaCppWrapper PRIVATE llama llama-common mtmd)
+    target_link_libraries(jniKriaCppWrapper PRIVATE llama llama-common mtmd log)
 
     if(VULKAN_LIB)
         target_link_libraries(jniKriaCppWrapper PRIVATE ${VULKAN_LIB})

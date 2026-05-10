@@ -1,4 +1,5 @@
 #include "JNIMethods/HardwareInfoJni.hpp"
+#include "util/NativeLogBuffer.hpp"
 #include <string>
 
 #ifdef GGML_USE_VULKAN
@@ -6,6 +7,23 @@
 #endif
 
 extern "C" {
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_getNativeLogTailBytes(
+    JNIEnv *env,
+    jobject /* this */
+) {
+    // Return raw UTF-8 bytes so Kotlin can decode safely; NewStringUTF expects
+    // modified-UTF-8 and rejects valid UTF-8 (4-byte sequences, embedded NULs)
+    // that llama.cpp can emit when it logs raw token bytes.
+    std::string tail = kria::NativeLogBuffer::instance().dump();
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(tail.size()));
+    if (out == nullptr) return nullptr;
+    env->SetByteArrayRegion(out, 0, static_cast<jsize>(tail.size()),
+                            reinterpret_cast<const jbyte*>(tail.data()));
+    return out;
+}
+
 
 JNIEXPORT jboolean JNICALL
 Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_isVulkanAvailable(

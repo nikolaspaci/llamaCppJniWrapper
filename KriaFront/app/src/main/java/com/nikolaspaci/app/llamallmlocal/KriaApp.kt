@@ -28,7 +28,9 @@ class KriaApp : Application() {
             val crashlytics = Firebase.crashlytics
 
             crashlytics.setCustomKey("device_model", Build.MODEL)
-            crashlytics.setCustomKey("soc_model", Build.SOC_MODEL)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                crashlytics.setCustomKey("soc_model", Build.SOC_MODEL)
+            }
             crashlytics.setCustomKey("cpu_cores", caps.cpuCores)
             crashlytics.setCustomKey("cpu_arch", caps.cpuArchitecture)
             crashlytics.setCustomKey("total_ram_gb", "%.1f".format(caps.totalRamBytes / (1024.0 * 1024.0 * 1024.0)))
