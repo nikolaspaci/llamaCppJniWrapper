@@ -19,6 +19,19 @@ enum class ThinkParseState {
     DETECTING_TAG   // Buffering to detect </think> close tag
 };
 
+// Replacement for the removed common_chat_params::thinking_forced_open:
+// the formatted prompt has an opened thinking tag that is not closed.
+static bool prompt_has_open_thinking(const std::string & prompt,
+                                     const std::string & start_tag,
+                                     const std::string & end_tag) {
+    if (start_tag.empty()) return false;
+    size_t last_start = prompt.rfind(start_tag);
+    if (last_start == std::string::npos) return false;
+    if (end_tag.empty()) return true;
+    size_t last_end = prompt.rfind(end_tag);
+    return last_end == std::string::npos || last_end < last_start;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     JNIEnv *env,
@@ -128,7 +141,10 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
 
                     auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                     formatted_prompt = chat_params.prompt;
-                    thinking_forced_open = wantThinking ? chat_params.thinking_forced_open : false;
+                    thinking_forced_open = wantThinking
+                        && prompt_has_open_thinking(formatted_prompt,
+                                                    chat_params.thinking_start_tag,
+                                                    chat_params.thinking_end_tag);
                     if (!formatted_prompt.empty()) return true;
                 } catch (...) {
                     // Jinja failed, fall through to non-Jinja path
@@ -528,7 +544,10 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
 
                 auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                 formatted_prompt = chat_params.prompt;
-                thinking_forced_open = wantThinkingMedia ? chat_params.thinking_forced_open : false;
+                thinking_forced_open = wantThinkingMedia
+                    && prompt_has_open_thinking(formatted_prompt,
+                                                chat_params.thinking_start_tag,
+                                                chat_params.thinking_end_tag);
                 if (!formatted_prompt.empty()) templateApplied = true;
             } catch (...) {
                 // Jinja failed, fall through
