@@ -99,7 +99,8 @@ int main(int argc, char **argv) {
     std::cout << "Attempting to initialize with model: " << model_path_c_str << std::endl;
 
     // 1. Test init
-    jlong session_ptr = Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(env, mock_this, model_path_jstr);
+    jobject mock_model_params = nullptr;
+    jlong session_ptr = Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_init(env, mock_this, model_path_jstr, mock_model_params);
     
     if (session_ptr == 0) {
         std::cerr << "TEST FAILED: init() returned a null session pointer." << std::endl;
@@ -118,7 +119,7 @@ MockCallback mock_callback;
 // 2. Créez un jobject mock qui pointe vers notre callback.
 // La manière de faire cela dépend de votre framework de test.
 // Conceptuellement, c'est un pointeur vers notre instance.
-jobject mock_callback_obj = &mock_callback; 
+jobject mock_callback_obj = reinterpret_cast<jobject>(&mock_callback);
 
 std::cout << "\nTesting streaming predict() with prompt: \"" << prompt_c_str << "\"" << std::endl;
 
@@ -130,6 +131,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     mock_this,
     session_ptr,
     prompt_jstr,
+    mock_model_params,
+    JNI_FALSE,
     mock_callback_obj
 );
 
