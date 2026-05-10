@@ -62,6 +62,13 @@ fun SettingsScreen(
                     IconButton(onClick = { viewModel.resetToDefaults() }) {
                         Icon(Icons.Default.Refresh, stringResource(R.string.settings_reset))
                     }
+                    val canSave = (uiState as? SettingsUiState.Ready)?.validationErrors?.isEmpty() == true
+                    IconButton(
+                        onClick = { viewModel.saveParameters() },
+                        enabled = canSave
+                    ) {
+                        Icon(Icons.Default.Save, stringResource(R.string.common_save))
+                    }
                 }
             )
         }
@@ -110,7 +117,6 @@ fun SettingsScreen(
                         onLoadPreset = { viewModel.loadSystemPromptPreset(it) },
                         onSaveAsPreset = { viewModel.saveCurrentAsPreset(it) },
                         onDeletePreset = { viewModel.deletePreset(it) },
-                        onSave = { viewModel.saveParameters() },
                         modifier = Modifier
                     )
                 }
@@ -147,7 +153,6 @@ private fun SettingsContent(
     onLoadPreset: (SystemPromptPreset) -> Unit,
     onSaveAsPreset: (String) -> Unit,
     onDeletePreset: (SystemPromptPreset) -> Unit,
-    onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -303,15 +308,6 @@ private fun SettingsContent(
                     onCheckedChange = { onParameterChange(parameters.copy(useGpu = it)) }
                 )
             }
-        }
-
-        // Save button
-        Button(
-            onClick = onSave,
-            enabled = errors.isEmpty(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.common_save))
         }
     }
 }
