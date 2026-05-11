@@ -1,5 +1,8 @@
 package com.nikolaspaci.app.llamallmlocal.viewmodel
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -12,6 +15,8 @@ import com.nikolaspaci.app.llamallmlocal.engine.ModelParameterProvider
 import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
 import com.nikolaspaci.app.llamallmlocal.usecase.PredictUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +25,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
 
@@ -76,6 +83,7 @@ class ChatViewModel @Inject constructor(
     private val engine: ModelEngine,
     private val predictUseCase: PredictUseCase,
     private val parameterProvider: ModelParameterProvider,
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -118,16 +126,24 @@ class ChatViewModel @Inject constructor(
                 .collect { conversationWithMessages ->
                     conversationWithMessages?.let { cwm ->
                         currentMessages = cwm.messages
-
-                        if (_modelPath.value != cwm.conversation.modelPath) {
-                            _modelPath.value = cwm.conversation.modelPath
-                            loadModel(cwm.conversation.modelPath)
+                        val newPath = cwm.conversation.modelPath
+                        val pathChanged = _modelPath.value != newPath
+                        if (pathChanged) {
+                            _modelPath.value = newPath
                         }
-
-                        updateUiState()
+                        if (pathChanged || !isEngineReadyFor(newPath)) {
+                            loadModel(newPath)
+                        } else {
+                            updateUiState()
+                        }
                     }
                 }
         }
+    }
+
+    private fun isEngineReadyFor(path: String): Boolean {
+        return engine.loadState.value is ModelEngine.LoadState.Loaded &&
+                engine.getCurrentModelPath() == path
     }
 
     private fun observeModelState() {
@@ -177,10 +193,31 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun triggerPendingPredictionIfNeeded() {
+    private suspend fun triggerPendingPredictionIfNeeded() {
         val lastMessage = currentMessages.lastOrNull() ?: return
         if (lastMessage.sender == Sender.USER) {
-            startPrediction(lastMessage.message)
+            val mediaBytes = decodeMediaBytes(lastMessage.mediaPath)
+            startPrediction(lastMessage.message, mediaBytes)
+        }
+    }
+
+    private suspend fun decodeMediaBytes(mediaPath: String?): ByteArray? {
+        if (mediaPath == null) return null
+        return withContext(Dispatchers.IO) {
+            try {
+                val uri = Uri.parse(mediaPath)
+                val bitmap: Bitmap? = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
+                bitmap?.let {
+                    val output = ByteArrayOutputStream()
+                    it.compress(Bitmap.CompressFormat.PNG, 100, output)
+                    it.recycle()
+                    output.toByteArray()
+                }
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
@@ -356,15 +393,21 @@ class ChatViewModel @Inject constructor(
     }
 
     fun retry() {
-        currentMessages.lastOrNull { it.sender == Sender.USER }?.let { lastUserMessage ->
-            startPrediction(lastUserMessage.message)
+        val lastUserMessage = currentMessages.lastOrNull { it.sender == Sender.USER } ?: return
+        viewModelScope.launch {
+            val mediaBytes = decodeMediaBytes(lastUserMessage.mediaPath)
+            startPrediction(lastUserMessage.message, mediaBytes)
         }
     }
 
     fun changeModel(newModelPath: String) {
         viewModelScope.launch {
+            val previousPath = _modelPath.value
             chatRepository.updateConversationModel(conversationId, newModelPath)
             parameterProvider.ensureConversationParameters(conversationId, newModelPath)
+            if (previousPath == newModelPath && !isEngineReadyFor(newModelPath)) {
+                loadModel(newModelPath)
+            }
         }
     }
 

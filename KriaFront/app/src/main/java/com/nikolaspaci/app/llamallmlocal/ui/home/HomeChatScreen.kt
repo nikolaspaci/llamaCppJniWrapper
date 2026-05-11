@@ -1,5 +1,8 @@
 package com.nikolaspaci.app.llamallmlocal.ui.home
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -51,6 +54,26 @@ fun HomeChatScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var pendingImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val hasVision = remember(selectedModelPath) {
+        selectedModelPath.isNotEmpty() && modelFileViewModel.hasVisionAdapter(selectedModelPath)
+    }
+
+    LaunchedEffect(hasVision) {
+        if (!hasVision) {
+            pendingImageUri = null
+        }
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            pendingImageUri = it
+        }
+    }
+
     LaunchedEffect(updatedModelPath) {
         updatedModelPath?.let { path ->
             selectedModelPath = path
@@ -91,9 +114,15 @@ fun HomeChatScreen(
             SmartChatInput(
                 onSendMessage = { userInput ->
                     if (selectedModelPath.isNotEmpty()) {
+                        val imageUriToSend = pendingImageUri
+                        pendingImageUri = null
                         scope.launch {
                             try {
-                                val newConversationId = homeViewModel.startNewConversation(selectedModelPath, userInput)
+                                val newConversationId = homeViewModel.startNewConversation(
+                                    modelPath = selectedModelPath,
+                                    firstMessage = userInput,
+                                    imageUri = imageUriToSend
+                                )
                                 onStartChat(newConversationId)
                             } catch (t: Throwable) {
                                 if (t is CancellationException) throw t
@@ -112,6 +141,12 @@ fun HomeChatScreen(
                 isEnabled = selectedModelPath.isNotEmpty(),
                 isGenerating = false,
                 onStopGeneration = {},
+                hasVision = hasVision,
+                pendingImageUri = pendingImageUri,
+                onAttachImage = { imagePickerLauncher.launch("image/*") },
+                onRemoveAttachment = {
+                    pendingImageUri = null
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))

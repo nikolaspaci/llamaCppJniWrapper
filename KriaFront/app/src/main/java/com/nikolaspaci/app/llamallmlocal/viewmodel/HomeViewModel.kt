@@ -1,5 +1,6 @@
 package com.nikolaspaci.app.llamallmlocal.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Conversation
@@ -15,14 +16,20 @@ class HomeViewModel @Inject constructor(
     private val parameterProvider: ModelParameterProvider
 ) : ViewModel() {
 
-    suspend fun startNewConversation(modelPath: String, firstMessage: String): Long {
+    suspend fun startNewConversation(
+        modelPath: String,
+        firstMessage: String,
+        imageUri: Uri? = null
+    ): Long {
         val conversation = Conversation(modelPath = modelPath)
         val conversationId = chatRepository.insertConversation(conversation)
         parameterProvider.ensureConversationParameters(conversationId, modelPath)
         val chatMessage = ChatMessage(
             conversationId = conversationId,
             sender = Sender.USER,
-            message = firstMessage
+            message = firstMessage,
+            mediaPath = imageUri?.toString(),
+            mediaType = if (imageUri != null) "image" else null
         )
         chatRepository.addMessageToConversation(chatMessage)
         return conversationId
