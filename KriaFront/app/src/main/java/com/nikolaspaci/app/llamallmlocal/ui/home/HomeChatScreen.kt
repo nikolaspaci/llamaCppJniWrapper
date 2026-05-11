@@ -20,11 +20,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.google.firebase.crashlytics.ktx.crashlytics
+import com.google.firebase.ktx.Firebase
 import com.nikolaspaci.app.llamallmlocal.R
-import com.nikolaspaci.app.llamallmlocal.di.RemoteErrorLoggerEntryPoint
 import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
@@ -32,7 +32,6 @@ import com.nikolaspaci.app.llamallmlocal.viewmodel.HomeViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.File
@@ -51,13 +50,6 @@ fun HomeChatScreen(
     var selectedModelPath by remember { mutableStateOf(modelFileViewModel.getModelPath() ?: "") }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val remoteErrorLogger = remember(context) {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            RemoteErrorLoggerEntryPoint::class.java
-        ).remoteErrorLogger()
-    }
 
     LaunchedEffect(updatedModelPath) {
         updatedModelPath?.let { path ->
@@ -105,14 +97,7 @@ fun HomeChatScreen(
                                 onStartChat(newConversationId)
                             } catch (t: Throwable) {
                                 if (t is CancellationException) throw t
-                                remoteErrorLogger.log(
-                                    source = "HomeChatScreen.startNewConversation",
-                                    throwable = t,
-                                    extras = mapOf(
-                                        "modelPath" to selectedModelPath,
-                                        "userInputLength" to userInput.length
-                                    )
-                                )
+                                Firebase.crashlytics.recordException(t)
                                 snackbarHostState.showSnackbar(
                                     "Erreur: ${t::class.java.simpleName} - ${t.message ?: "(sans message)"}"
                                 )

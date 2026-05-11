@@ -9,7 +9,6 @@ import com.nikolaspaci.app.llamallmlocal.PredictCallback
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
 import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
-import com.nikolaspaci.app.llamallmlocal.util.RemoteErrorLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -29,8 +28,7 @@ import javax.inject.Singleton
 @Singleton
 class LlamaEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val modelLoadGuard: ModelLoadGuard,
-    private val errorLogger: RemoteErrorLogger
+    private val modelLoadGuard: ModelLoadGuard
 ) : ModelEngine {
 
     private var sessionPtr: Long = 0
@@ -58,70 +56,38 @@ class LlamaEngine @Inject constructor(
 
     private fun ensureBackendsLoaded() {
         if (!backendsLoaded) {
-            val resolution = resolveNativeLibDir()
-            val files = runCatching { File(resolution.path).list()?.toList().orEmpty() }
-                .getOrDefault(emptyList())
-            Log.i(TAG, "Loading GGML backends from: ${resolution.path} (files=${files.size}, source=${resolution.source})")
-            errorLogger.checkpoint("ensureBackendsLoaded.path", mapOf(
-                "nativeLibDir" to resolution.path,
-                "resolutionSource" to resolution.source,
-                "applicationInfoNativeLibDir" to context.applicationInfo.nativeLibraryDir,
-                "findLibraryRaw" to resolution.findLibraryRaw,
-                "exists" to File(resolution.path).exists(),
-                "canRead" to File(resolution.path).canRead(),
-                "fileCount" to files.size,
-                "ggmlCpuFiles" to files.filter { it.startsWith("libggml-cpu") }
-            ))
-            LlamaApi.loadBackends(resolution.path)
+            val nativeLibDir = resolveNativeLibDir()
+            Log.i(TAG, "Loading GGML backends from: $nativeLibDir")
+            LlamaApi.loadBackends(nativeLibDir)
             backendsLoaded = true
         }
     }
-
-    private data class NativeLibDirResolution(
-        val path: String,
-        val source: String,
-        val findLibraryRaw: String?
-    )
 
     /**
      * Returns the on-disk directory that actually contains our packaged
      * `libggml-cpu-*.so` variants.
      *
-     * Two install paths to handle:
-     * - Single APK (assembleRelease, adb install): libs are extracted to
-     *   `applicationInfo.nativeLibraryDir`. Default is fine.
-     * - App Bundle / Play Store: AGP defaults to uncompressed-in-APK
-     *   (`extractNativeLibs=false`) and Play often enforces it regardless of
-     *   the manifest. In that case `findLibrary("jniKriaCppWrapper")` returns
-     *   a virtual `.../split_config.<abi>.apk!/lib/<abi>/...` path that the
-     *   C++ `std::filesystem::directory_iterator` cannot traverse. We force
-     *   extraction via `packaging.jniLibs.useLegacyPackaging = true`, but we
-     *   still validate here so a future Play behavior change doesn't silently
-     *   reintroduce the bug.
+     * On App Bundle / Play Store delivery, AGP defaults to uncompressed-in-APK
+     * (`extractNativeLibs=false`) and Play often enforces it regardless of the
+     * manifest, so libs live virtually inside `split_config.<abi>.apk!/lib/...`
+     * — addressable by the dynamic linker but not traversable by C++
+     * `std::filesystem`. We force extraction via
+     * `packaging.jniLibs.useLegacyPackaging = true`, but we still validate
+     * here so a future Play behavior change doesn't silently reintroduce
+     * the "no backends loaded" bug.
      */
-    private fun resolveNativeLibDir(): NativeLibDirResolution {
+    private fun resolveNativeLibDir(): String {
         val fallback = context.applicationInfo.nativeLibraryDir
-        var rawLibPath: String? = null
         return try {
             val cl = context.classLoader as? dalvik.system.BaseDexClassLoader
-            rawLibPath = cl?.findLibrary("jniKriaCppWrapper")
-            val parent = rawLibPath?.let { File(it).parentFile }
-
-            when {
-                parent == null -> NativeLibDirResolution(fallback, "fallback.findLibraryNull", rawLibPath)
-                // Reject virtual `.apk!/lib/...` paths — std::filesystem can't iterate them.
-                parent.absolutePath.contains(".apk!") ->
-                    NativeLibDirResolution(fallback, "fallback.virtualApkPath", rawLibPath)
-                !parent.isDirectory ->
-                    NativeLibDirResolution(fallback, "fallback.notADirectory", rawLibPath)
-                parent.list()?.any { it.startsWith("libggml-cpu") } != true ->
-                    NativeLibDirResolution(fallback, "fallback.noGgmlCpuFiles", rawLibPath)
-                else ->
-                    NativeLibDirResolution(parent.absolutePath, "classLoader.findLibrary", rawLibPath)
-            }
+            val rawLibPath = cl?.findLibrary("jniKriaCppWrapper") ?: return fallback
+            val parent = File(rawLibPath).parentFile ?: return fallback
+            val isReal = parent.isDirectory && !parent.absolutePath.contains(".apk!")
+            val hasGgml = parent.list()?.any { it.startsWith("libggml-cpu") } == true
+            if (isReal && hasGgml) parent.absolutePath else fallback
         } catch (t: Throwable) {
             Log.w(TAG, "resolveNativeLibDir fell back to applicationInfo", t)
-            NativeLibDirResolution(fallback, "fallback.exception:${t::class.java.simpleName}", rawLibPath)
+            fallback
         }
     }
 
@@ -129,16 +95,6 @@ class LlamaEngine @Inject constructor(
     override val loadState: StateFlow<ModelEngine.LoadState> = _loadState.asStateFlow()
 
     override suspend fun loadModel(modelPath: String, parameters: ModelParameter): Result<Unit> {
-        val modelFileName = File(modelPath).name
-        val modelSizeBytes = runCatching { File(modelPath).length() }.getOrDefault(-1L)
-        errorLogger.checkpoint("loadModel.start", mapOf(
-            "modelFile" to modelFileName,
-            "modelSizeBytes" to modelSizeBytes,
-            "contextSize" to parameters.contextSize,
-            "threadCount" to parameters.threadCount,
-            "useGpu" to parameters.useGpu,
-            "gpuLayers" to parameters.gpuLayers
-        ))
         return mutex.withLock {
             try {
                 val modelName = File(modelPath).nameWithoutExtension
@@ -146,18 +102,9 @@ class LlamaEngine @Inject constructor(
 
                 // Pre-flight check
                 val preflight = modelLoadGuard.check(modelPath, parameters)
-                errorLogger.checkpoint("loadModel.preflight", mapOf(
-                    "canLoad" to preflight.canLoad,
-                    "error" to preflight.error,
-                    "warnings" to preflight.warnings.joinToString("; ").take(500),
-                    "adjusted" to (preflight.adjustedParameters != null)
-                ))
                 if (!preflight.canLoad) {
                     val error = preflight.error ?: "Pre-flight check failed"
                     _loadState.value = ModelEngine.LoadState.Error(error)
-                    errorLogger.log("LlamaEngine.loadModel.preflight",
-                        IllegalStateException(error),
-                        mapOf("modelFile" to modelFileName))
                     return@withLock Result.failure(IllegalStateException(error))
                 }
                 for (warning in preflight.warnings) {
@@ -172,12 +119,10 @@ class LlamaEngine @Inject constructor(
                     Log.i(TAG, "Reusing already-loaded model: $modelName")
                     currentSystemPrompt = effectiveParams.systemPrompt
                     _loadState.value = ModelEngine.LoadState.Loaded(modelName)
-                    errorLogger.checkpoint("loadModel.reused", mapOf("modelFile" to modelFileName))
                     return@withLock Result.success(Unit)
                 }
 
                 if (sessionPtr != 0L) {
-                    errorLogger.checkpoint("loadModel.freeingPrevious")
                     withContext(Dispatchers.IO) {
                         LlamaApi.free(sessionPtr)
                     }
@@ -187,26 +132,12 @@ class LlamaEngine @Inject constructor(
                 }
 
                 withContext(Dispatchers.IO) {
-                    errorLogger.checkpoint("loadModel.ensureBackends.start",
-                        mapOf("backendsAlreadyLoaded" to backendsLoaded))
                     ensureBackendsLoaded()
-                    errorLogger.checkpoint("loadModel.ensureBackends.done")
-
-                    errorLogger.checkpoint("loadModel.llamaInit.start", mapOf(
-                        "modelFile" to modelFileName,
-                        "contextSize" to effectiveParams.contextSize,
-                        "threadCount" to effectiveParams.threadCount
-                    ))
                     sessionPtr = LlamaApi.init(modelPath, effectiveParams)
-                    errorLogger.checkpoint("loadModel.llamaInit.done",
-                        mapOf("sessionOk" to (sessionPtr != 0L)))
                 }
 
                 if (sessionPtr == 0L) {
                     _loadState.value = ModelEngine.LoadState.Error("Echec du chargement du modele")
-                    errorLogger.log("LlamaEngine.loadModel.llamaInit",
-                        IllegalStateException("LlamaApi.init returned 0"),
-                        mapOf("modelFile" to modelFileName))
                     Result.failure(IllegalStateException("Model loading failed"))
                 } else {
                     currentModelPath = modelPath
@@ -218,14 +149,11 @@ class LlamaEngine @Inject constructor(
 
                     _loadState.value = ModelEngine.LoadState.Loaded(modelName)
                     setCrashlyticsModelKeys(modelName, effectiveParams)
-                    errorLogger.checkpoint("loadModel.success", mapOf("modelFile" to modelFileName))
                     Result.success(Unit)
                 }
             } catch (e: Exception) {
                 _loadState.value = ModelEngine.LoadState.Error(e.message ?: "Erreur inconnue")
-                errorLogger.log("LlamaEngine.loadModel",
-                    e,
-                    mapOf("modelFile" to modelFileName, "modelSizeBytes" to modelSizeBytes))
+                Firebase.crashlytics.recordException(e)
                 Result.failure(e)
             }
         }
@@ -302,51 +230,28 @@ class LlamaEngine @Inject constructor(
     }
 
     override fun predict(prompt: String, parameters: ModelParameter, enableThinking: Boolean): Flow<PredictionEvent> = callbackFlow {
-        errorLogger.checkpoint("predict.start", mapOf(
-            "promptLength" to prompt.length,
-            "enableThinking" to enableThinking,
-            "sessionOk" to (sessionPtr != 0L)
-        ))
         if (sessionPtr == 0L) {
-            errorLogger.log("LlamaEngine.predict",
-                IllegalStateException("Aucun modele charge"),
-                mapOf("promptLength" to prompt.length))
             trySend(PredictionEvent.Error("Aucun modele charge", isRecoverable = false))
             close()
             return@callbackFlow
         }
 
-        var firstTokenSent = false
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
-                if (!firstTokenSent) {
-                    firstTokenSent = true
-                    errorLogger.checkpoint("predict.firstToken")
-                }
                 trySend(PredictionEvent.Token(token))
             }
 
             override fun onThinkingToken(token: String) {
-                if (!firstTokenSent) {
-                    firstTokenSent = true
-                    errorLogger.checkpoint("predict.firstToken", mapOf("thinking" to true))
-                }
                 trySend(PredictionEvent.ThinkingToken(token))
             }
 
             override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
-                errorLogger.checkpoint("predict.complete", mapOf(
-                    "tokensPerSecond" to tokensPerSecond,
-                    "durationInSeconds" to durationInSeconds
-                ))
                 trySend(PredictionEvent.Completion(tokensPerSecond, durationInSeconds))
                 close()
             }
 
             override fun onError(error: String) {
-                errorLogger.log("LlamaEngine.predict.callback",
-                    RuntimeException("Prediction error: $error"),
-                    mapOf("promptLength" to prompt.length))
+                Firebase.crashlytics.recordException(RuntimeException("Prediction error: $error"))
                 trySend(PredictionEvent.Error(error, isRecoverable = true))
                 close()
             }
@@ -358,53 +263,28 @@ class LlamaEngine @Inject constructor(
     }.flowOn(Dispatchers.IO)
 
     override fun predictWithMedia(prompt: String, imageData: ByteArray?, parameters: ModelParameter, enableThinking: Boolean): Flow<PredictionEvent> = callbackFlow {
-        errorLogger.checkpoint("predictWithMedia.start", mapOf(
-            "promptLength" to prompt.length,
-            "hasImage" to (imageData != null),
-            "imageBytes" to (imageData?.size ?: 0),
-            "enableThinking" to enableThinking,
-            "sessionOk" to (sessionPtr != 0L)
-        ))
         if (sessionPtr == 0L) {
-            errorLogger.log("LlamaEngine.predictWithMedia",
-                IllegalStateException("Aucun modele charge"),
-                mapOf("promptLength" to prompt.length))
             trySend(PredictionEvent.Error("Aucun modele charge", isRecoverable = false))
             close()
             return@callbackFlow
         }
 
-        var firstTokenSent = false
         val callback = object : PredictCallback {
             override fun onToken(token: String) {
-                if (!firstTokenSent) {
-                    firstTokenSent = true
-                    errorLogger.checkpoint("predictWithMedia.firstToken")
-                }
                 trySend(PredictionEvent.Token(token))
             }
 
             override fun onThinkingToken(token: String) {
-                if (!firstTokenSent) {
-                    firstTokenSent = true
-                    errorLogger.checkpoint("predictWithMedia.firstToken", mapOf("thinking" to true))
-                }
                 trySend(PredictionEvent.ThinkingToken(token))
             }
 
             override fun onComplete(tokensPerSecond: Double, durationInSeconds: Long) {
-                errorLogger.checkpoint("predictWithMedia.complete", mapOf(
-                    "tokensPerSecond" to tokensPerSecond,
-                    "durationInSeconds" to durationInSeconds
-                ))
                 trySend(PredictionEvent.Completion(tokensPerSecond, durationInSeconds))
                 close()
             }
 
             override fun onError(error: String) {
-                errorLogger.log("LlamaEngine.predictWithMedia.callback",
-                    RuntimeException("Prediction error: $error"),
-                    mapOf("promptLength" to prompt.length))
+                Firebase.crashlytics.recordException(RuntimeException("Prediction error: $error"))
                 trySend(PredictionEvent.Error(error, isRecoverable = true))
                 close()
             }

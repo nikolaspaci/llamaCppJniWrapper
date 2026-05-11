@@ -5,29 +5,22 @@
 
 #ifdef __ANDROID__
 #include "ggml.h"
-#include "util/NativeLogBuffer.hpp"
 #include <android/log.h>
 
+// Mirror llama.cpp / ggml log lines to logcat under tag "llama.cpp" so
+// `adb logcat -s llama.cpp` shows native progress during dev.
 static void kria_native_log_callback(ggml_log_level level, const char *text, void * /*user_data*/) {
     if (text == nullptr) return;
     int prio;
-    const char* level_str;
     switch (level) {
-        case GGML_LOG_LEVEL_ERROR: prio = ANDROID_LOG_ERROR; level_str = "E"; break;
-        case GGML_LOG_LEVEL_WARN:  prio = ANDROID_LOG_WARN;  level_str = "W"; break;
-        case GGML_LOG_LEVEL_INFO:  prio = ANDROID_LOG_INFO;  level_str = "I"; break;
-        case GGML_LOG_LEVEL_DEBUG: prio = ANDROID_LOG_DEBUG; level_str = "D"; break;
-        case GGML_LOG_LEVEL_CONT:  prio = ANDROID_LOG_INFO;  level_str = "I"; break;
-        default:                   prio = ANDROID_LOG_INFO;  level_str = "V"; break;
+        case GGML_LOG_LEVEL_ERROR: prio = ANDROID_LOG_ERROR; break;
+        case GGML_LOG_LEVEL_WARN:  prio = ANDROID_LOG_WARN;  break;
+        case GGML_LOG_LEVEL_INFO:  prio = ANDROID_LOG_INFO;  break;
+        case GGML_LOG_LEVEL_DEBUG: prio = ANDROID_LOG_DEBUG; break;
+        case GGML_LOG_LEVEL_CONT:  prio = ANDROID_LOG_INFO;  break;
+        default:                   prio = ANDROID_LOG_INFO;  break;
     }
     __android_log_write(prio, "llama.cpp", text);
-    // Callback is invoked through a C ABI from ggml/llama.cpp threads —
-    // any escaping C++ exception (e.g. std::bad_alloc from buffer push) is UB.
-    try {
-        kria::NativeLogBuffer::instance().push(level_str, "llama.cpp", text);
-    } catch (...) {
-        // Drop the line silently rather than corrupt the caller.
-    }
 }
 #endif
 

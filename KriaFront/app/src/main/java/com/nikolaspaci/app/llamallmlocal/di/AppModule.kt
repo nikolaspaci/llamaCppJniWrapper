@@ -18,8 +18,6 @@ import com.nikolaspaci.app.llamallmlocal.engine.ModelParameterProvider
 import com.nikolaspaci.app.llamallmlocal.data.curated.AppVersionCode
 import com.nikolaspaci.app.llamallmlocal.util.HardwareCapabilities
 import com.nikolaspaci.app.llamallmlocal.util.OptimalConfigurationService
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.firebase.crashlytics.ktx.crashlytics
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestoreSettings
 import com.google.firebase.firestore.ktx.firestore
@@ -129,21 +127,12 @@ object AppModule {
     @Provides
     @Singleton
     fun provideFirebaseFirestore(): FirebaseFirestore {
-        // Single source of truth for Firestore configuration. Hilt instantiates
-        // this @Singleton on first injection and never again, so the settings
-        // assignment happens exactly once and before any Firestore operation —
-        // provided every consumer gets the instance through Hilt and nobody
-        // touches Firebase.firestore directly.
         return Firebase.firestore.apply {
             firestoreSettings = firestoreSettings {
                 setLocalCacheSettings(persistentCacheSettings { })
             }
         }
     }
-
-    @Provides
-    @Singleton
-    fun provideFirebaseCrashlytics(): FirebaseCrashlytics = Firebase.crashlytics
 
     @Provides
     @Singleton
