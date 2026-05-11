@@ -275,7 +275,9 @@ fun ModelManagementScreen(
                             entry = entry,
                             isSelected = entry.absolutePath in selected,
                             isActive = entry.absolutePath == activeModelPath,
-                            onToggle = { viewModel.toggleSelection(entry.absolutePath) }
+                            inSelectionMode = inSelectionMode,
+                            onToggle = { viewModel.toggleSelection(entry.absolutePath) },
+                            onLongPress = { viewModel.toggleSelection(entry.absolutePath) }
                         )
                     }
                 }

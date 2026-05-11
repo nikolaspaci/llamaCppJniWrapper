@@ -1,8 +1,9 @@
 package com.nikolaspaci.app.llamallmlocal.ui.models
 
 import android.text.format.Formatter
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,18 +23,21 @@ import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.repository.CachedModelEntry
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ModelRow(
     entry: CachedModelEntry,
     isSelected: Boolean,
     isActive: Boolean,
-    onToggle: () -> Unit
+    inSelectionMode: Boolean,
+    onToggle: () -> Unit,
+    onLongPress: () -> Unit
 ) {
     val context = LocalContext.current
     ListItem(
-        leadingContent = {
-            Checkbox(checked = isSelected, onCheckedChange = { onToggle() })
-        },
+        leadingContent = if (inSelectionMode) {
+            { Checkbox(checked = isSelected, onCheckedChange = { onToggle() }) }
+        } else null,
         headlineContent = {
             Text(
                 text = entry.file.name,
@@ -71,7 +75,10 @@ fun ModelRow(
         ) else ListItemDefaults.colors(),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onToggle() }
+            .combinedClickable(
+                onClick = { if (inSelectionMode) onToggle() },
+                onLongClick = onLongPress
+            )
     )
 }
 
