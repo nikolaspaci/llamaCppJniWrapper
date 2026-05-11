@@ -169,7 +169,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                 }
 
                 HomeChatScreen(
-                    homeViewModel = viewModel(factory = factory),
+                    homeViewModel = hiltViewModel(),
                     modelFileViewModel = modelFileViewModel,
                     onStartChat = { conversationId ->
                         navController.navigate(Screen.Chat.createRoute(conversationId))
