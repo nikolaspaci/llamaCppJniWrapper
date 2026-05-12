@@ -1,6 +1,5 @@
 package com.nikolaspaci.app.llamallmlocal.engine
 
-import android.content.Context
 import android.util.Log
 import com.google.firebase.crashlytics.ktx.crashlytics
 import com.google.firebase.ktx.Firebase
@@ -9,7 +8,6 @@ import com.nikolaspaci.app.llamallmlocal.PredictCallback
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.ModelParameter
 import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -27,8 +25,8 @@ import javax.inject.Singleton
 
 @Singleton
 class LlamaEngine @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val modelLoadGuard: ModelLoadGuard
+    private val modelLoadGuard: ModelLoadGuard,
+    private val nativeBackendLoader: NativeBackendLoader
 ) : ModelEngine {
 
     private var sessionPtr: Long = 0
@@ -36,7 +34,6 @@ class LlamaEngine @Inject constructor(
     private var currentSystemPrompt: String = ""
     private var currentLoadParams: LoadTimeParams? = null
     private val mutex = Mutex()
-    @Volatile private var backendsLoaded = false
 
     private data class LoadTimeParams(
         val contextSize: Int,
@@ -51,43 +48,6 @@ class LlamaEngine @Inject constructor(
                 useGpu = p.useGpu,
                 gpuLayers = p.gpuLayers
             )
-        }
-    }
-
-    private fun ensureBackendsLoaded() {
-        if (!backendsLoaded) {
-            val nativeLibDir = resolveNativeLibDir()
-            Log.i(TAG, "Loading GGML backends from: $nativeLibDir")
-            LlamaApi.loadBackends(nativeLibDir)
-            backendsLoaded = true
-        }
-    }
-
-    /**
-     * Returns the on-disk directory that actually contains our packaged
-     * `libggml-cpu-*.so` variants.
-     *
-     * On App Bundle / Play Store delivery, AGP defaults to uncompressed-in-APK
-     * (`extractNativeLibs=false`) and Play often enforces it regardless of the
-     * manifest, so libs live virtually inside `split_config.<abi>.apk!/lib/...`
-     * — addressable by the dynamic linker but not traversable by C++
-     * `std::filesystem`. We force extraction via
-     * `packaging.jniLibs.useLegacyPackaging = true`, but we still validate
-     * here so a future Play behavior change doesn't silently reintroduce
-     * the "no backends loaded" bug.
-     */
-    private fun resolveNativeLibDir(): String {
-        val fallback = context.applicationInfo.nativeLibraryDir
-        return try {
-            val cl = context.classLoader as? dalvik.system.BaseDexClassLoader
-            val rawLibPath = cl?.findLibrary("jniKriaCppWrapper") ?: return fallback
-            val parent = File(rawLibPath).parentFile ?: return fallback
-            val isReal = parent.isDirectory && !parent.absolutePath.contains(".apk!")
-            val hasGgml = parent.list()?.any { it.startsWith("libggml-cpu") } == true
-            if (isReal && hasGgml) parent.absolutePath else fallback
-        } catch (t: Throwable) {
-            Log.w(TAG, "resolveNativeLibDir fell back to applicationInfo", t)
-            fallback
         }
     }
 
@@ -132,7 +92,7 @@ class LlamaEngine @Inject constructor(
                 }
 
                 withContext(Dispatchers.IO) {
-                    ensureBackendsLoaded()
+                    nativeBackendLoader.ensureLoaded()
                     sessionPtr = LlamaApi.init(modelPath, effectiveParams)
                 }
 

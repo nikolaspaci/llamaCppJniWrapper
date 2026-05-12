@@ -22,7 +22,8 @@ import javax.inject.Singleton
 
 @Singleton
 class WhisperEngine @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val nativeBackendLoader: NativeBackendLoader
 ) : SpeechEngine {
 
     private var sessionPtr: Long = 0
@@ -50,6 +51,7 @@ class WhisperEngine @Inject constructor(
                 }
 
                 withContext(Dispatchers.IO) {
+                    nativeBackendLoader.ensureLoaded()
                     sessionPtr = WhisperApi.init(modelPath, nThreads, useGpu)
                 }
 
