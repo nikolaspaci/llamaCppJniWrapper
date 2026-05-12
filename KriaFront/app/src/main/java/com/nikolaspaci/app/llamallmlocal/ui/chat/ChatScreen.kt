@@ -31,6 +31,7 @@ import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.VoiceInputUiState
+import com.nikolaspaci.app.llamallmlocal.ui.common.WhisperModelPickerDialog
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatErrorType
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
@@ -56,23 +57,19 @@ fun ChatScreen(
     val speechViewModel: SpeechInputViewModel = hiltViewModel()
     val speechState by speechViewModel.state.collectAsState()
     val transcribedText by speechViewModel.transcribed.collectAsState()
-    val voiceAvailable = speechViewModel.hasWhisperModel()
+    val showVariantPicker by speechViewModel.variantPickerVisible.collectAsState()
 
     val voicePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            speechViewModel.startRecording()
-        } else {
-            // permission refused; surface via snackbar below
-        }
+        if (granted) speechViewModel.startRecording()
     }
 
-    val permissionDeniedMsg = stringResource(R.string.chat_voice_permission_denied)
-    val voiceUi = when (speechState) {
+    val voiceUi: VoiceInputUiState = when (val s = speechState) {
         is SpeechInputViewModel.UiState.Recording -> VoiceInputUiState.Recording
         is SpeechInputViewModel.UiState.Transcribing -> VoiceInputUiState.Transcribing
-        else -> if (voiceAvailable) VoiceInputUiState.Idle else VoiceInputUiState.Unavailable
+        is SpeechInputViewModel.UiState.Downloading -> VoiceInputUiState.Downloading(s.progress)
+        else -> VoiceInputUiState.Idle
     }
 
     LaunchedEffect(speechState) {
@@ -128,6 +125,13 @@ fun ChatScreen(
     val isModelReady = uiState is ChatUiState.Ready ||
                        uiState is ChatUiState.Generating ||
                        uiState is ChatUiState.MessageComplete
+
+    if (showVariantPicker) {
+        WhisperModelPickerDialog(
+            onPick = { variant -> speechViewModel.chooseVariant(variant) },
+            onDismiss = { speechViewModel.dismissVariantPicker() }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.imePadding(),

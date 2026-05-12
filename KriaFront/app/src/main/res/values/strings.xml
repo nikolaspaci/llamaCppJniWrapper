@@ -50,6 +50,32 @@
     <string name="chat_voice_cancel">Cancel voice input</string>
     <string name="chat_voice_permission_denied">Microphone permission denied</string>
     <string name="chat_voice_no_model">No speech-to-text model installed</string>
+    <string name="chat_voice_downloading">Downloading model… %1$d%%</string>
+    <string name="whisper_picker_title">Choose a speech-to-text model</string>
+    <string name="whisper_picker_subtitle">Downloaded once, used for all voice input. You can switch later by clearing app data.</string>
+    <string name="whisper_picker_tiny">Tiny — fast, ~78 MB</string>
+    <string name="whisper_picker_base">Base — balanced, ~148 MB</string>
+    <string name="whisper_picker_small">Small — best quality, ~488 MB</string>
+    <string name="whisper_picker_tiny_desc">Lightest. Works on any device but lower accuracy.</string>
+    <string name="whisper_picker_base_desc">Recommended. Good accuracy and reasonable speed on phones.</string>
+    <string name="whisper_picker_small_desc">Best for noisy audio. Heavier on RAM and slower.</string>
+    <string name="nav_app_settings">Settings</string>
+    <string name="app_settings_title">Settings</string>
+    <string name="app_settings_models_section">Models</string>
+    <string name="app_settings_models_description">Browse, download and manage local LLM models</string>
+    <string name="app_settings_voice_description">Choose and manage the speech-to-text model</string>
+    <string name="voice_settings_title">Voice input</string>
+    <string name="app_settings_voice_section">Voice input</string>
+    <string name="app_settings_voice_installed">%1$s · %2$s</string>
+    <string name="app_settings_voice_none">No model installed</string>
+    <string name="app_settings_voice_downloading">Downloading %1$s · %2$d%%</string>
+    <string name="app_settings_voice_change">Change model</string>
+    <string name="app_settings_voice_delete">Delete model</string>
+    <string name="app_settings_voice_delete_confirm_title">Delete voice model?</string>
+    <string name="app_settings_voice_delete_confirm_message">The speech-to-text model file will be removed. You can re-download it later.</string>
+    <string name="app_settings_voice_variant_tiny">Tiny</string>
+    <string name="app_settings_voice_variant_base">Base</string>
+    <string name="app_settings_voice_variant_small">Small</string>
     <string name="chat_regenerate">Regenerate</string>
     <string name="chat_tokens_count">%1$d tokens</string>
     <string name="chat_stats_line">%1$.1f tokens/s · %2$ds · %3$d tokens</string>
@@ -166,6 +192,11 @@
     <string name="models_mmproj_dialog_desc">The vision adapter will be saved next to the selected model.</string>
     <string name="models_mmproj_dialog_empty">No base model in cache. Download or import a .gguf first.</string>
     <string name="models_mmproj_dialog_continue">Continue</string>
+    <string name="models_import_dialog_title">Importing model…</string>
+    <string name="models_import_dialog_message">Copying %1$s to local cache. Please keep the app open.</string>
+    <string name="models_import_unknown_size">Computing size…</string>
+    <string name="models_import_progress">%1$s of %2$s</string>
+    <string name="models_import_cancel">Cancel import</string>
 
     <!-- Hardware info -->
     <string name="hardware_title">Hardware Configuration</string>

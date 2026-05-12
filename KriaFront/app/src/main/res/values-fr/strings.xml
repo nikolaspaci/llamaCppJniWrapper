@@ -159,6 +159,11 @@
     <string name="models_mmproj_dialog_desc">L\'adaptateur vision sera enregistré à côté du modèle sélectionné.</string>
     <string name="models_mmproj_dialog_empty">Aucun modèle de base en cache. Téléchargez ou importez un .gguf d\'abord.</string>
     <string name="models_mmproj_dialog_continue">Continuer</string>
+    <string name="models_import_dialog_title">Importation du modèle…</string>
+    <string name="models_import_dialog_message">Copie de %1$s vers le cache local. Gardez l\'application ouverte.</string>
+    <string name="models_import_unknown_size">Calcul de la taille…</string>
+    <string name="models_import_progress">%1$s sur %2$s</string>
+    <string name="models_import_cancel">Annuler l\'importation</string>
 
     <!-- Hardware info -->
     <string name="hardware_title">Configuration matérielle</string>
@@ -173,4 +178,43 @@
     <string name="hardware_vram">VRAM : %1$s</string>
     <string name="hardware_npu">NPU</string>
     <string name="hardware_npu_available">Disponible</string>
+
+    <!-- Voice input (whisper) -->
+    <string name="chat_voice_input">Saisie vocale</string>
+    <string name="chat_voice_recording">Enregistrement…</string>
+    <string name="chat_voice_transcribing">Transcription…</string>
+    <string name="chat_voice_validate">Arrêter et transcrire</string>
+    <string name="chat_voice_cancel">Annuler la saisie vocale</string>
+    <string name="chat_voice_permission_denied">Permission microphone refusée</string>
+    <string name="chat_voice_no_model">Aucun modèle de transcription installé</string>
+    <string name="chat_voice_downloading">Téléchargement du modèle… %1$d%%</string>
+
+    <!-- Whisper model picker -->
+    <string name="whisper_picker_title">Choisir un modèle de transcription</string>
+    <string name="whisper_picker_subtitle">Téléchargé une seule fois, utilisé pour toute la saisie vocale. Vous pourrez changer plus tard depuis les Paramètres.</string>
+    <string name="whisper_picker_tiny">Tiny — rapide, ~78 Mo</string>
+    <string name="whisper_picker_base">Base — équilibré, ~148 Mo</string>
+    <string name="whisper_picker_small">Small — meilleure qualité, ~488 Mo</string>
+    <string name="whisper_picker_tiny_desc">Le plus léger. Fonctionne sur tout appareil mais précision réduite.</string>
+    <string name="whisper_picker_base_desc">Recommandé. Bonne précision et vitesse raisonnable sur téléphone.</string>
+    <string name="whisper_picker_small_desc">Idéal pour audio bruité. Plus lourd en RAM et plus lent.</string>
+
+    <!-- App Settings -->
+    <string name="nav_app_settings">Paramètres</string>
+    <string name="app_settings_title">Paramètres</string>
+    <string name="app_settings_models_section">Modèles</string>
+    <string name="app_settings_models_description">Parcourir, télécharger et gérer les modèles LLM locaux</string>
+    <string name="app_settings_voice_description">Choisir et gérer le modèle de transcription vocale</string>
+    <string name="voice_settings_title">Saisie vocale</string>
+    <string name="app_settings_voice_section">Saisie vocale</string>
+    <string name="app_settings_voice_installed">%1$s · %2$s</string>
+    <string name="app_settings_voice_none">Aucun modèle installé</string>
+    <string name="app_settings_voice_downloading">Téléchargement %1$s · %2$d%%</string>
+    <string name="app_settings_voice_change">Changer de modèle</string>
+    <string name="app_settings_voice_delete">Supprimer le modèle</string>
+    <string name="app_settings_voice_delete_confirm_title">Supprimer le modèle vocal ?</string>
+    <string name="app_settings_voice_delete_confirm_message">Le fichier du modèle de transcription sera supprimé. Vous pourrez le retélécharger plus tard.</string>
+    <string name="app_settings_voice_variant_tiny">Tiny</string>
+    <string name="app_settings_voice_variant_base">Base</string>
+    <string name="app_settings_voice_variant_small">Small</string>
 </resources>

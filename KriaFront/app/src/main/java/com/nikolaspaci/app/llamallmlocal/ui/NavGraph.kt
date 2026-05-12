@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,7 +39,9 @@ import com.nikolaspaci.app.llamallmlocal.ui.common.SearchBar
 import com.nikolaspaci.app.llamallmlocal.ui.home.HomeChatScreen
 import com.nikolaspaci.app.llamallmlocal.ui.huggingface.HuggingFaceScreen
 import com.nikolaspaci.app.llamallmlocal.ui.models.ModelManagementScreen
+import com.nikolaspaci.app.llamallmlocal.ui.settings.AppSettingsScreen
 import com.nikolaspaci.app.llamallmlocal.ui.settings.SettingsScreen
+import com.nikolaspaci.app.llamallmlocal.ui.settings.VoiceSettingsScreen
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HistoryViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HuggingFaceViewModel
@@ -65,6 +67,8 @@ sealed class Screen(val route: String) {
     }
     object HuggingFace : Screen("huggingface")
     object ModelManagement : Screen("model_management")
+    object AppSettings : Screen("app_settings")
+    object VoiceSettings : Screen("voice_settings")
 }
 
 @Composable
@@ -105,14 +109,14 @@ fun AppNavigation(factory: ViewModelFactory) {
                     NavigationDrawerItem(
                         icon = {
                             Icon(
-                                Icons.Rounded.Storage,
+                                Icons.Rounded.Settings,
                                 contentDescription = null
                             )
                         },
-                        label = { Text(stringResource(R.string.nav_manage_models)) },
-                        selected = navController.currentDestination?.route == Screen.ModelManagement.route,
+                        label = { Text(stringResource(R.string.nav_app_settings)) },
+                        selected = navController.currentDestination?.route == Screen.AppSettings.route,
                         onClick = {
-                            navController.navigate(Screen.ModelManagement.route)
+                            navController.navigate(Screen.AppSettings.route)
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -236,6 +240,18 @@ fun AppNavigation(factory: ViewModelFactory) {
                     modelFileViewModel = modelFileViewModel,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToHuggingFace = { navController.navigate(Screen.HuggingFace.route) }
+                )
+            }
+            composable(Screen.AppSettings.route) {
+                AppSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToManageModels = { navController.navigate(Screen.ModelManagement.route) },
+                    onNavigateToVoiceSettings = { navController.navigate(Screen.VoiceSettings.route) }
+                )
+            }
+            composable(Screen.VoiceSettings.route) {
+                VoiceSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(

@@ -10,8 +10,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,10 +30,12 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -56,6 +60,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.repository.CachedModelEntry
+import com.nikolaspaci.app.llamallmlocal.viewmodel.ImportState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelManagementViewModel
 
@@ -72,6 +77,7 @@ fun ModelManagementScreen(
     val selected by viewModel.selected.collectAsState()
     val activeModelPath by viewModel.activeModelPath.collectAsState()
     val isDeleting by viewModel.isDeleting.collectAsState()
+    val importState by modelFileViewModel.importState.collectAsState()
 
     var showConfirm by remember { mutableStateOf(false) }
     var showMmprojPicker by remember { mutableStateOf(false) }
@@ -186,6 +192,14 @@ fun ModelManagementScreen(
                 mmprojTargetPath = chosen.absolutePath
                 mmprojLauncher.launch(safIntent())
             }
+        )
+    }
+
+    (importState as? ImportState.Copying)?.let { copying ->
+        ImportProgressDialog(
+            copying = copying,
+            context = context,
+            onCancel = { modelFileViewModel.cancelImport() }
         )
     }
 
@@ -380,4 +394,64 @@ private fun MmprojTargetDialog(
 private fun safIntent(): Intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
     addCategory(Intent.CATEGORY_OPENABLE)
     type = "*/*"
+}
+
+@Composable
+private fun ImportProgressDialog(
+    copying: ImportState.Copying,
+    context: android.content.Context,
+    onCancel: () -> Unit
+) {
+    val knownSize = copying.totalBytes > 0
+    val progress = if (knownSize) {
+        (copying.bytesCopied.toFloat() / copying.totalBytes).coerceIn(0f, 1f)
+    } else 0f
+
+    AlertDialog(
+        onDismissRequest = { /* not dismissible */ },
+        title = { Text(stringResource(R.string.models_import_dialog_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.models_import_dialog_message, copying.fileName),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                if (knownSize) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.models_import_progress,
+                            Formatter.formatFileSize(context, copying.bytesCopied),
+                            Formatter.formatFileSize(context, copying.totalBytes)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.models_import_unknown_size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.models_import_cancel))
+            }
+        }
+    )
 }

@@ -34,6 +34,7 @@ import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
 import com.nikolaspaci.app.llamallmlocal.ui.common.VoiceInputUiState
+import com.nikolaspaci.app.llamallmlocal.ui.common.WhisperModelPickerDialog
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HomeViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.SpeechInputViewModel
@@ -92,7 +93,7 @@ fun HomeChatScreen(
     val speechViewModel: SpeechInputViewModel = hiltViewModel()
     val speechState by speechViewModel.state.collectAsState()
     val transcribedText by speechViewModel.transcribed.collectAsState()
-    val voiceAvailable = speechViewModel.hasWhisperModel()
+    val showVariantPicker by speechViewModel.variantPickerVisible.collectAsState()
 
     val voicePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -100,10 +101,11 @@ fun HomeChatScreen(
         if (granted) speechViewModel.startRecording()
     }
 
-    val voiceUi = when (speechState) {
+    val voiceUi: VoiceInputUiState = when (val s = speechState) {
         is SpeechInputViewModel.UiState.Recording -> VoiceInputUiState.Recording
         is SpeechInputViewModel.UiState.Transcribing -> VoiceInputUiState.Transcribing
-        else -> if (voiceAvailable) VoiceInputUiState.Idle else VoiceInputUiState.Unavailable
+        is SpeechInputViewModel.UiState.Downloading -> VoiceInputUiState.Downloading(s.progress)
+        else -> VoiceInputUiState.Idle
     }
 
     LaunchedEffect(speechState) {
@@ -112,6 +114,13 @@ fun HomeChatScreen(
             snackbarHostState.showSnackbar(s.message)
             speechViewModel.dismissError()
         }
+    }
+
+    if (showVariantPicker) {
+        WhisperModelPickerDialog(
+            onPick = { variant -> speechViewModel.chooseVariant(variant) },
+            onDismiss = { speechViewModel.dismissVariantPicker() }
+        )
     }
 
     Scaffold(

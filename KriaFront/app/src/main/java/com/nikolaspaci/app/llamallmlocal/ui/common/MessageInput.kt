@@ -53,7 +53,13 @@ import com.nikolaspaci.app.llamallmlocal.R
 
 private enum class InputState { EMPTY, HAS_TEXT, GENERATING, MIC }
 
-enum class VoiceInputUiState { Unavailable, Idle, Recording, Transcribing }
+sealed class VoiceInputUiState {
+    data object Unavailable : VoiceInputUiState()
+    data object Idle : VoiceInputUiState()
+    data object Recording : VoiceInputUiState()
+    data object Transcribing : VoiceInputUiState()
+    data class Downloading(val progress: Float) : VoiceInputUiState()
+}
 
 @Composable
 fun SmartChatInput(
@@ -86,7 +92,7 @@ fun SmartChatInput(
     val inputState = when {
         isGenerating -> InputState.GENERATING
         text.isNotBlank() -> InputState.HAS_TEXT
-        voiceState != VoiceInputUiState.Unavailable -> InputState.MIC
+        voiceState !is VoiceInputUiState.Unavailable -> InputState.MIC
         else -> InputState.EMPTY
     }
 
@@ -136,7 +142,9 @@ fun SmartChatInput(
             color = MaterialTheme.colorScheme.surfaceVariant,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         ) {
-            if (voiceState == VoiceInputUiState.Recording || voiceState == VoiceInputUiState.Transcribing) {
+            if (voiceState is VoiceInputUiState.Recording ||
+                voiceState is VoiceInputUiState.Transcribing ||
+                voiceState is VoiceInputUiState.Downloading) {
                 VoiceRecordingBar(
                     voiceState = voiceState,
                     onValidate = onStopVoice,
@@ -332,48 +340,62 @@ private fun VoiceRecordingBar(
             contentAlignment = Alignment.CenterStart
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (voiceState == VoiceInputUiState.Transcribing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = stringResource(R.string.chat_voice_transcribing),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .padding(0.dp)
-                    ) {
+                when (voiceState) {
+                    is VoiceInputUiState.Recording -> {
                         Surface(
                             color = MaterialTheme.colorScheme.error,
                             shape = CircleShape,
                             modifier = Modifier.size(10.dp)
                         ) {}
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(R.string.chat_voice_recording),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = stringResource(R.string.chat_voice_recording),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    is VoiceInputUiState.Transcribing -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(R.string.chat_voice_transcribing),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    is VoiceInputUiState.Downloading -> {
+                        CircularProgressIndicator(
+                            progress = { voiceState.progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(
+                                R.string.chat_voice_downloading,
+                                (voiceState.progress * 100).toInt()
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    else -> { /* not reachable */ }
                 }
             }
         }
         Surface(
             shape = CircleShape,
-            color = if (voiceState == VoiceInputUiState.Recording)
+            color = if (voiceState is VoiceInputUiState.Recording)
                 MaterialTheme.colorScheme.primary
             else
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
             modifier = Modifier.size(36.dp),
-            onClick = { if (voiceState == VoiceInputUiState.Recording) onValidate() }
+            onClick = { if (voiceState is VoiceInputUiState.Recording) onValidate() }
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(

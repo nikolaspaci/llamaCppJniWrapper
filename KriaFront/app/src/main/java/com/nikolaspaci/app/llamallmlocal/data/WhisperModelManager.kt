@@ -30,4 +30,24 @@ class WhisperModelManager @Inject constructor(
     fun defaultModelOrNull(): File? = listWhisperModels().firstOrNull()
 
     fun hasAnyModel(): Boolean = listWhisperModels().isNotEmpty()
+
+    /**
+     * Remove all whisper models and partial downloads under [whisperRoot].
+     * Returns true if the directory is empty afterwards.
+     */
+    fun deleteAll(): Boolean {
+        val root = whisperRoot()
+        val files = root.listFiles() ?: return true
+        var allDeleted = true
+        for (f in files) {
+            if (f.isFile) {
+                try {
+                    if (!f.delete()) allDeleted = false
+                } catch (_: SecurityException) {
+                    allDeleted = false
+                }
+            }
+        }
+        return allDeleted
+    }
 }
