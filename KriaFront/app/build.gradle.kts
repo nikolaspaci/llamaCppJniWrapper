@@ -23,8 +23,8 @@ android {
         applicationId = "com.nikolaspaci.app.llamallmlocal"
         minSdk = 34
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.6.0"
+        versionCode = 13
+        versionName = "1.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
