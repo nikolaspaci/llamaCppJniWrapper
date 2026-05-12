@@ -96,8 +96,11 @@ Java_com_nikolaspaci_app_llamallmlocal_WhisperApi_transcribePcm(
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.n_threads        = session->n_threads;
     params.translate        = (translate == JNI_TRUE);
+    // language="auto" lets whisper auto-detect AND transcribe in one pass.
+    // detect_language=true would only run language detection and return
+    // without producing any segment, leaving fullText empty.
     params.language         = lang_str.c_str();
-    params.detect_language  = (lang_str == "auto");
+    params.detect_language  = false;
     params.print_progress   = false;
     params.print_realtime   = false;
     params.print_timestamps = false;
