@@ -1,4 +1,5 @@
 #include "JNIMethods/PredictJni.hpp"
+#include "JNIMethods/ReasoningStreamer.hpp"
 #include "jni.h"
 #include "common.h"
 #include "sampling.h"
@@ -6,31 +7,10 @@
 #include "llama.h"
 #include "chat.h"
 #include "session/LlamaSession.hpp"
-#include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
-#include <sstream>
 #include <cstring>
-
-// State machine for parsing <think> tags in streaming output
-enum class ThinkParseState {
-    INSIDE_THINK,   // Currently inside thinking content
-    OUTSIDE_THINK,  // Normal response content
-    DETECTING_TAG   // Buffering to detect </think> close tag
-};
-
-// Replacement for the removed common_chat_params::thinking_forced_open:
-// the formatted prompt has an opened thinking tag that is not closed.
-static bool prompt_has_open_thinking(const std::string & prompt,
-                                     const std::string & start_tag,
-                                     const std::string & end_tag) {
-    if (start_tag.empty()) return false;
-    size_t last_start = prompt.rfind(start_tag);
-    if (last_start == std::string::npos) return false;
-    if (end_tag.empty()) return true;
-    size_t last_end = prompt.rfind(end_tag);
-    return last_end == std::string::npos || last_end < last_start;
-}
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
@@ -125,7 +105,10 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
 
     // 2. Apply chat template using common_chat_templates_apply
     std::string formatted_prompt;
-    bool thinking_forced_open = false;
+    // Holds the chat_params from the Jinja-with-thinking path, when usable for
+    // reasoning extraction. Empty in all other cases (no thinking, Jinja
+    // fallback without thinking, or legacy C API).
+    std::optional<common_chat_params> parsing_chat_params;
     const bool wantThinking = (enableThinking == JNI_TRUE) && session->thinkingSupported;
 
     auto applyWithFallback = [&]() -> bool {
@@ -138,14 +121,20 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
                     inputs.add_generation_prompt = true;
                     inputs.use_jinja = true;
                     inputs.enable_thinking = wantThinking;
+                    // Build the PEG arena with reasoning extraction rules; without
+                    // this, the parser would leave <think>/[THINK]/<|channel|>... in content.
+                    inputs.reasoning_format = wantThinking
+                        ? COMMON_REASONING_FORMAT_DEEPSEEK
+                        : COMMON_REASONING_FORMAT_NONE;
 
                     auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                     formatted_prompt = chat_params.prompt;
-                    thinking_forced_open = wantThinking
-                        && prompt_has_open_thinking(formatted_prompt,
-                                                    chat_params.thinking_start_tag,
-                                                    chat_params.thinking_end_tag);
-                    if (!formatted_prompt.empty()) return true;
+                    if (!formatted_prompt.empty()) {
+                        if (wantThinking) {
+                            parsing_chat_params = std::move(chat_params);
+                        }
+                        return true;
+                    }
                 } catch (...) {
                     // Jinja failed, fall through to non-Jinja path
                 }
@@ -161,7 +150,6 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
 
                 auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                 formatted_prompt = chat_params.prompt;
-                thinking_forced_open = false;
                 if (!formatted_prompt.empty()) return true;
             } catch (...) {
                 // Fall through to legacy C API
@@ -186,7 +174,6 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
         llama_chat_apply_template(template_buffer.data(), legacy_msgs.data(), legacy_msgs.size(), true,
                                   fmtBuf.data(), fmtBuf.size());
         formatted_prompt.assign(fmtBuf.begin(), fmtBuf.begin() + prompt_size);
-        thinking_forced_open = false;
         return true;
     };
 
@@ -240,8 +227,6 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     }
 
     // Configure the generation
-    std::stringstream response_ss;
-    std::stringstream thinking_ss;
     const int max_new_tokens = maxTokens;
     int n_cur = n_tokens;
 
@@ -255,11 +240,13 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     auto start_time = std::chrono::high_resolution_clock::now();
     int tokens_generated = 0;
 
-    // Thinking state machine
-    bool useThinkParsing = (enableThinking == JNI_TRUE) && session->thinkingSupported && thinking_forced_open;
-    ThinkParseState thinkState = useThinkParsing ? ThinkParseState::INSIDE_THINK : ThinkParseState::OUTSIDE_THINK;
-    std::string tagBuffer;
-    static const std::string THINK_CLOSE_TAG = "</think>";
+    // Reasoning streamer: when chat_params is available (Jinja path with
+    // thinking enabled), parse incrementally via common_chat_parse so that
+    // <think>, [THINK], <|channel|>analysis<|message|>, etc. are all split
+    // uniformly. Otherwise bypass and stream raw content.
+    ReasoningStreamer streamer(env, callback_obj, on_token_method, on_thinking_token_method,
+                               parsing_chat_params.value_or(common_chat_params{}),
+                               parsing_chat_params.has_value());
 
     // Generation loop
     for (int i = 0; i < max_new_tokens && n_cur < n_ctx; ++i) {
@@ -277,97 +264,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
         std::string piece = common_token_to_piece(context, new_token_id, true);
 
         if (!piece.empty()) {
-            if (useThinkParsing) {
-                // Process each character through the state machine
-                for (size_t ci = 0; ci < piece.size(); ++ci) {
-                    char ch = piece[ci];
-
-                    switch (thinkState) {
-                        case ThinkParseState::INSIDE_THINK:
-                            if (ch == '<') {
-                                // Might be start of </think> tag
-                                tagBuffer.clear();
-                                tagBuffer += ch;
-                                thinkState = ThinkParseState::DETECTING_TAG;
-                            } else {
-                                // Regular thinking content
-                                thinking_ss << ch;
-                                if (on_thinking_token_method) {
-                                    std::string s(1, ch);
-                                    jstring token_j = env->NewStringUTF(s.c_str());
-                                    env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-                                    env->DeleteLocalRef(token_j);
-                                }
-                            }
-                            break;
-
-                        case ThinkParseState::DETECTING_TAG:
-                            tagBuffer += ch;
-                            if (tagBuffer.size() <= THINK_CLOSE_TAG.size()) {
-                                // Check if still matching </think>
-                                if (THINK_CLOSE_TAG.compare(0, tagBuffer.size(), tagBuffer) == 0) {
-                                    if (tagBuffer.size() == THINK_CLOSE_TAG.size()) {
-                                        // Complete </think> tag found - switch to response mode
-                                        thinkState = ThinkParseState::OUTSIDE_THINK;
-                                        tagBuffer.clear();
-                                    }
-                                    // else keep buffering
-                                } else {
-                                    // Not a </think> tag - flush buffer as thinking content
-                                    thinking_ss << tagBuffer;
-                                    if (on_thinking_token_method) {
-                                        jstring token_j = env->NewStringUTF(tagBuffer.c_str());
-                                        env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-                                        env->DeleteLocalRef(token_j);
-                                    }
-                                    tagBuffer.clear();
-                                    thinkState = ThinkParseState::INSIDE_THINK;
-                                }
-                            } else {
-                                // Buffer overflow - flush as thinking content
-                                thinking_ss << tagBuffer;
-                                if (on_thinking_token_method) {
-                                    jstring token_j = env->NewStringUTF(tagBuffer.c_str());
-                                    env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-                                    env->DeleteLocalRef(token_j);
-                                }
-                                tagBuffer.clear();
-                                thinkState = ThinkParseState::INSIDE_THINK;
-                            }
-                            break;
-
-                        case ThinkParseState::OUTSIDE_THINK:
-                            response_ss << ch;
-                            // Batch send is handled below
-                            break;
-                    }
-                }
-
-                // Send accumulated response content as a single token callback
-                if (thinkState == ThinkParseState::OUTSIDE_THINK) {
-                    std::string responseChunk;
-                    // Extract only the new chars that went to response_ss in this piece
-                    // We do this by checking what was added in this iteration
-                    std::string fullResponse = response_ss.str();
-                    static thread_local size_t lastResponseLen = 0;
-                    if (i == 0) lastResponseLen = 0; // Reset at start of generation
-                    if (fullResponse.size() > lastResponseLen) {
-                        responseChunk = fullResponse.substr(lastResponseLen);
-                        lastResponseLen = fullResponse.size();
-                        if (!responseChunk.empty()) {
-                            jstring token_j = env->NewStringUTF(responseChunk.c_str());
-                            env->CallVoidMethod(callback_obj, on_token_method, token_j);
-                            env->DeleteLocalRef(token_j);
-                        }
-                    }
-                }
-            } else {
-                // No thinking parsing - send directly as response
-                jstring token_j = env->NewStringUTF(piece.c_str());
-                env->CallVoidMethod(callback_obj, on_token_method, token_j);
-                env->DeleteLocalRef(token_j);
-                response_ss << piece;
-            }
+            streamer.feed(piece);
         }
 
         common_batch_clear(batch);
@@ -380,13 +277,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
         tokens_generated++;
     }
 
-    // Flush any remaining tag buffer as thinking content
-    if (!tagBuffer.empty() && on_thinking_token_method) {
-        thinking_ss << tagBuffer;
-        jstring token_j = env->NewStringUTF(tagBuffer.c_str());
-        env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-        env->DeleteLocalRef(token_j);
-    }
+    auto streamer_result = streamer.finish();
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -396,8 +287,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predict(
     common_sampler_free(smpl);
     llama_batch_free(batch);
 
-    std::string response_str = response_ss.str();
-    std::string thinking_str = thinking_ss.str();
+    std::string response_str = std::move(streamer_result.content);
+    std::string thinking_str = std::move(streamer_result.reasoning_content);
 
     // If cancelled during generation, keep the partial state in context
     if (session->cancelRequested.load()) {
@@ -528,7 +419,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
 
     // Apply chat template
     std::string formatted_prompt;
-    bool thinking_forced_open = false;
+    std::optional<common_chat_params> parsing_chat_params;
     const bool wantThinkingMedia = (enableThinking == JNI_TRUE) && session->thinkingSupported;
 
     bool templateApplied = false;
@@ -541,14 +432,18 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
                 inputs.add_generation_prompt = true;
                 inputs.use_jinja = true;
                 inputs.enable_thinking = wantThinkingMedia;
+                inputs.reasoning_format = wantThinkingMedia
+                    ? COMMON_REASONING_FORMAT_DEEPSEEK
+                    : COMMON_REASONING_FORMAT_NONE;
 
                 auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                 formatted_prompt = chat_params.prompt;
-                thinking_forced_open = wantThinkingMedia
-                    && prompt_has_open_thinking(formatted_prompt,
-                                                chat_params.thinking_start_tag,
-                                                chat_params.thinking_end_tag);
-                if (!formatted_prompt.empty()) templateApplied = true;
+                if (!formatted_prompt.empty()) {
+                    if (wantThinkingMedia) {
+                        parsing_chat_params = std::move(chat_params);
+                    }
+                    templateApplied = true;
+                }
             } catch (...) {
                 // Jinja failed, fall through
             }
@@ -564,7 +459,6 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
 
                 auto chat_params = common_chat_templates_apply(session->chatTemplates.get(), inputs);
                 formatted_prompt = chat_params.prompt;
-                thinking_forced_open = false;
                 if (!formatted_prompt.empty()) templateApplied = true;
             } catch (...) {
                 // Fall through to error
@@ -635,8 +529,6 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
     }
 
     // Generation loop (same as text-only predict, with thinking support)
-    std::stringstream response_ss;
-    std::stringstream thinking_ss;
     int n_cur = static_cast<int>(new_n_past);
 
     common_sampler *smpl = common_sampler_init(model, session->sparams);
@@ -648,10 +540,9 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
     auto start_time = std::chrono::high_resolution_clock::now();
     int tokens_generated = 0;
 
-    bool useThinkParsing = (enableThinking == JNI_TRUE) && session->thinkingSupported && thinking_forced_open;
-    ThinkParseState thinkState = useThinkParsing ? ThinkParseState::INSIDE_THINK : ThinkParseState::OUTSIDE_THINK;
-    std::string tagBuffer;
-    static const std::string THINK_CLOSE_TAG = "</think>";
+    ReasoningStreamer streamer(env, callback_obj, on_token_method, on_thinking_token_method,
+                               parsing_chat_params.value_or(common_chat_params{}),
+                               parsing_chat_params.has_value());
 
     llama_batch batch = llama_batch_init(n_ctx, 0, 1);
 
@@ -672,79 +563,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
         std::string piece = common_token_to_piece(context, new_token_id, true);
 
         if (!piece.empty()) {
-            if (useThinkParsing) {
-                for (size_t ci = 0; ci < piece.size(); ++ci) {
-                    char ch = piece[ci];
-                    switch (thinkState) {
-                        case ThinkParseState::INSIDE_THINK:
-                            if (ch == '<') {
-                                tagBuffer.clear();
-                                tagBuffer += ch;
-                                thinkState = ThinkParseState::DETECTING_TAG;
-                            } else {
-                                thinking_ss << ch;
-                                if (on_thinking_token_method) {
-                                    std::string s(1, ch);
-                                    jstring token_j = env->NewStringUTF(s.c_str());
-                                    env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-                                    env->DeleteLocalRef(token_j);
-                                }
-                            }
-                            break;
-                        case ThinkParseState::DETECTING_TAG:
-                            tagBuffer += ch;
-                            if (tagBuffer.size() <= THINK_CLOSE_TAG.size()) {
-                                if (THINK_CLOSE_TAG.compare(0, tagBuffer.size(), tagBuffer) == 0) {
-                                    if (tagBuffer.size() == THINK_CLOSE_TAG.size()) {
-                                        thinkState = ThinkParseState::OUTSIDE_THINK;
-                                        tagBuffer.clear();
-                                    }
-                                } else {
-                                    thinking_ss << tagBuffer;
-                                    if (on_thinking_token_method) {
-                                        jstring token_j = env->NewStringUTF(tagBuffer.c_str());
-                                        env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-                                        env->DeleteLocalRef(token_j);
-                                    }
-                                    tagBuffer.clear();
-                                    thinkState = ThinkParseState::INSIDE_THINK;
-                                }
-                            } else {
-                                thinking_ss << tagBuffer;
-                                if (on_thinking_token_method) {
-                                    jstring token_j = env->NewStringUTF(tagBuffer.c_str());
-                                    env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-                                    env->DeleteLocalRef(token_j);
-                                }
-                                tagBuffer.clear();
-                                thinkState = ThinkParseState::INSIDE_THINK;
-                            }
-                            break;
-                        case ThinkParseState::OUTSIDE_THINK:
-                            response_ss << ch;
-                            break;
-                    }
-                }
-                if (thinkState == ThinkParseState::OUTSIDE_THINK) {
-                    std::string fullResponse = response_ss.str();
-                    static thread_local size_t lastResponseLen2 = 0;
-                    if (i == 0) lastResponseLen2 = 0;
-                    if (fullResponse.size() > lastResponseLen2) {
-                        std::string responseChunk = fullResponse.substr(lastResponseLen2);
-                        lastResponseLen2 = fullResponse.size();
-                        if (!responseChunk.empty()) {
-                            jstring token_j = env->NewStringUTF(responseChunk.c_str());
-                            env->CallVoidMethod(callback_obj, on_token_method, token_j);
-                            env->DeleteLocalRef(token_j);
-                        }
-                    }
-                }
-            } else {
-                jstring token_j = env->NewStringUTF(piece.c_str());
-                env->CallVoidMethod(callback_obj, on_token_method, token_j);
-                env->DeleteLocalRef(token_j);
-                response_ss << piece;
-            }
+            streamer.feed(piece);
         }
 
         common_batch_clear(batch);
@@ -757,12 +576,7 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
         tokens_generated++;
     }
 
-    if (!tagBuffer.empty() && on_thinking_token_method) {
-        thinking_ss << tagBuffer;
-        jstring token_j = env->NewStringUTF(tagBuffer.c_str());
-        env->CallVoidMethod(callback_obj, on_thinking_token_method, token_j);
-        env->DeleteLocalRef(token_j);
-    }
+    auto streamer_result = streamer.finish();
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -772,8 +586,8 @@ Java_com_nikolaspaci_app_llamallmlocal_LlamaApi_predictWithMedia(
     common_sampler_free(smpl);
     llama_batch_free(batch);
 
-    std::string response_str = response_ss.str();
-    std::string thinking_str = thinking_ss.str();
+    std::string response_str = std::move(streamer_result.content);
+    std::string thinking_str = std::move(streamer_result.reasoning_content);
 
     if (session->cancelRequested.load()) {
         session->n_past = n_cur;
