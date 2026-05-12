@@ -28,9 +28,12 @@ import androidx.compose.runtime.getValue
 import com.nikolaspaci.app.llamallmlocal.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nikolaspaci.app.llamallmlocal.ui.chat.ChatScreen
@@ -84,6 +87,17 @@ fun AppNavigation(factory: ViewModelFactory) {
         )
     )
 
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+
+    fun navigateTopLevel(route: String) {
+        navController.navigate(route) {
+            popUpTo(Screen.Home.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -100,9 +114,9 @@ fun AppNavigation(factory: ViewModelFactory) {
                             )
                         },
                         label = { Text(stringResource(R.string.nav_new_chat)) },
-                        selected = navController.currentDestination?.route == Screen.Home.route,
+                        selected = currentRoute == Screen.Home.route,
                         onClick = {
-                            navController.navigate(Screen.Home.route)
+                            navigateTopLevel(Screen.Home.route)
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -114,9 +128,9 @@ fun AppNavigation(factory: ViewModelFactory) {
                             )
                         },
                         label = { Text(stringResource(R.string.nav_app_settings)) },
-                        selected = navController.currentDestination?.route == Screen.AppSettings.route,
+                        selected = currentRoute == Screen.AppSettings.route,
                         onClick = {
-                            navController.navigate(Screen.AppSettings.route)
+                            navigateTopLevel(Screen.AppSettings.route)
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -137,7 +151,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                     HistoryMenuItems(
                         viewModel = historyViewModel,
                         onConversationClick = { conversationId ->
-                            navController.navigate(Screen.Chat.createRoute(conversationId))
+                            navigateTopLevel(Screen.Chat.createRoute(conversationId))
                             scope.launch { drawerState.close() }
                         },
                         onCloseMenu = {
@@ -160,17 +174,18 @@ fun AppNavigation(factory: ViewModelFactory) {
             }
         }
     ) {
-        NavHost(navController = navController, startDestination = Screen.Home.route) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Home.route,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) {
             composable(Screen.Home.route) { backStackEntry ->
                 val savedStateHandle = backStackEntry.savedStateHandle
                 val selectedModelFromSettings by savedStateHandle.getStateFlow<String?>("selected_model_path", null)
                     .collectAsState()
-
-                LaunchedEffect(selectedModelFromSettings) {
-                    selectedModelFromSettings?.let {
-                        savedStateHandle.remove<String>("selected_model_path")
-                    }
-                }
 
                 HomeChatScreen(
                     homeViewModel = hiltViewModel(),
@@ -187,7 +202,10 @@ fun AppNavigation(factory: ViewModelFactory) {
                     onNavigateToSettings = { modelId ->
                         navController.navigate(Screen.Settings.createRoute(modelId))
                     },
-                    updatedModelPath = selectedModelFromSettings
+                    updatedModelPath = selectedModelFromSettings,
+                    onUpdatedModelPathConsumed = {
+                        savedStateHandle.remove<String>("selected_model_path")
+                    }
                 )
             }
             composable(
@@ -216,7 +234,7 @@ fun AppNavigation(factory: ViewModelFactory) {
                         scope.launch { drawerState.open() }
                     },
                     onNewChat = {
-                        navController.navigate(Screen.Home.route)
+                        navigateTopLevel(Screen.Home.route)
                     },
                     onNavigateToSettings = { modelId ->
                         navController.navigate(Screen.Settings.createRouteForConversation(modelId, conversationId))

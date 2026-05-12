@@ -53,7 +53,8 @@ fun HomeChatScreen(
     onOpenDrawer: () -> Unit,
     onNavigateToManageModels: () -> Unit = {},
     onNavigateToSettings: ((String) -> Unit)? = null,
-    updatedModelPath: String? = null
+    updatedModelPath: String? = null,
+    onUpdatedModelPathConsumed: () -> Unit = {}
 ) {
     var selectedModelPath by remember { mutableStateOf(modelFileViewModel.getModelPath() ?: "") }
     val scope = rememberCoroutineScope()
@@ -83,6 +84,7 @@ fun HomeChatScreen(
         updatedModelPath?.let { path ->
             selectedModelPath = path
             modelFileViewModel.saveModelPath(path)
+            onUpdatedModelPathConsumed()
         }
     }
 
