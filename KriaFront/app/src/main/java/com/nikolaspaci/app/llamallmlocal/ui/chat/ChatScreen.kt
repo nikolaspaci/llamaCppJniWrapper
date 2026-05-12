@@ -26,12 +26,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
+import com.nikolaspaci.app.llamallmlocal.ui.common.VoiceInputUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatErrorType
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.SpeechInputViewModel
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +52,36 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val hasVision by viewModel.hasVision.collectAsState()
     val pendingImageUri by viewModel.pendingImageUri.collectAsState()
+
+    val speechViewModel: SpeechInputViewModel = hiltViewModel()
+    val speechState by speechViewModel.state.collectAsState()
+    val transcribedText by speechViewModel.transcribed.collectAsState()
+    val voiceAvailable = speechViewModel.hasWhisperModel()
+
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            speechViewModel.startRecording()
+        } else {
+            // permission refused; surface via snackbar below
+        }
+    }
+
+    val permissionDeniedMsg = stringResource(R.string.chat_voice_permission_denied)
+    val voiceUi = when (speechState) {
+        is SpeechInputViewModel.UiState.Recording -> VoiceInputUiState.Recording
+        is SpeechInputViewModel.UiState.Transcribing -> VoiceInputUiState.Transcribing
+        else -> if (voiceAvailable) VoiceInputUiState.Idle else VoiceInputUiState.Unavailable
+    }
+
+    LaunchedEffect(speechState) {
+        val s = speechState
+        if (s is SpeechInputViewModel.UiState.Error) {
+            snackbarHostState.showSnackbar(s.message)
+            speechViewModel.dismissError()
+        }
+    }
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -118,6 +151,18 @@ fun ChatScreen(
                 pendingImageUri = pendingImageUri,
                 onAttachImage = { imagePickerLauncher.launch("image/*") },
                 onRemoveAttachment = { viewModel.removeAttachment() },
+                voiceState = voiceUi,
+                onStartVoice = {
+                    if (speechViewModel.hasMicrophonePermission()) {
+                        speechViewModel.startRecording()
+                    } else {
+                        voicePermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                onStopVoice = { speechViewModel.stopRecording() },
+                onCancelVoice = { speechViewModel.cancel() },
+                injectedText = transcribedText,
+                onInjectedTextConsumed = { speechViewModel.consumeTranscribed() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp)

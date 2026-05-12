@@ -1,3 +1,6 @@
 [submodule "KriaCpp/extern/llama.cpp"]
 	path = KriaCpp/extern/llama.cpp
 	url = https://github.com/ggerganov/llama.cpp.git
+[submodule "KriaCpp/extern/whisper.cpp"]
+	path = KriaCpp/extern/whisper.cpp
+	url = https://github.com/ggerganov/whisper.cpp.git

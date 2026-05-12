@@ -17,6 +17,9 @@ set(SOURCE_FILES_LIST
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/HardwareInfoJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/StopPredictJni.cpp
     ${PROJECT_SOURCE_DIR}/src/JNIMethods/CapabilitiesJni.cpp
+    ${PROJECT_SOURCE_DIR}/src/JNIMethods/Whisper/InitWhisperJni.cpp
+    ${PROJECT_SOURCE_DIR}/src/JNIMethods/Whisper/TranscribeJni.cpp
+    ${PROJECT_SOURCE_DIR}/src/JNIMethods/Whisper/FreeWhisperJni.cpp
 )
 
 if(ANDROID)
@@ -58,6 +61,13 @@ set(LLAMA_TOOLS_INSTALL OFF CACHE BOOL "Don't install tool executables" FORCE)
 
 add_subdirectory(extern/llama.cpp llama_cpp_build)
 
+# whisper.cpp - reuse ggml target already built by llama.cpp
+# (whisper's CMake has `if (NOT TARGET ggml)` guard, so it skips its own ggml)
+set(WHISPER_BUILD_TESTS    OFF CACHE BOOL "Disable whisper tests" FORCE)
+set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "Disable whisper examples" FORCE)
+set(WHISPER_BUILD_SERVER   OFF CACHE BOOL "Disable whisper server" FORCE)
+add_subdirectory(extern/whisper.cpp whisper_cpp_build)
+
 if(ANDROID)
     # Single generic JNI wrapper — no -march flags, baseline safe
     add_library(jniKriaCppWrapper SHARED ${SOURCE_FILES_LIST})
@@ -69,6 +79,7 @@ if(ANDROID)
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/ggml/include
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/tools/mtmd
+        ${PROJECT_SOURCE_DIR}/extern/whisper.cpp/include
     )
 
     target_compile_options(jniKriaCppWrapper PRIVATE
@@ -82,7 +93,7 @@ if(ANDROID)
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs/${ANDROID_ABI}"
     )
 
-    target_link_libraries(jniKriaCppWrapper PRIVATE llama llama-common mtmd log)
+    target_link_libraries(jniKriaCppWrapper PRIVATE llama llama-common mtmd whisper log)
 
     if(VULKAN_LIB)
         target_link_libraries(jniKriaCppWrapper PRIVATE ${VULKAN_LIB})
@@ -97,13 +108,14 @@ else()
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/common
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/ggml/include
         ${PROJECT_SOURCE_DIR}/extern/llama.cpp/tools/mtmd
+        ${PROJECT_SOURCE_DIR}/extern/whisper.cpp/include
     )
     target_compile_options(jniKriaCppWrapper PRIVATE -march=native -O3)
     find_package(JNI REQUIRED)
     set_target_properties(jniKriaCppWrapper PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/libs"
     )
-    target_link_libraries(jniKriaCppWrapper PRIVATE llama llama-common mtmd)
+    target_link_libraries(jniKriaCppWrapper PRIVATE llama llama-common mtmd whisper)
 endif()
 
 

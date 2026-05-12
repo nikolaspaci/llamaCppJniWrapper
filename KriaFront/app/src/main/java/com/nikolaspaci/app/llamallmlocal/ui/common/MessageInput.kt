@@ -22,9 +22,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -32,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +51,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.nikolaspaci.app.llamallmlocal.R
 
-private enum class InputState { EMPTY, HAS_TEXT, GENERATING }
+private enum class InputState { EMPTY, HAS_TEXT, GENERATING, MIC }
+
+enum class VoiceInputUiState { Unavailable, Idle, Recording, Transcribing }
 
 @Composable
 fun SmartChatInput(
@@ -59,13 +65,28 @@ fun SmartChatInput(
     pendingImageUri: Uri? = null,
     onAttachImage: () -> Unit = {},
     onRemoveAttachment: () -> Unit = {},
+    voiceState: VoiceInputUiState = VoiceInputUiState.Unavailable,
+    onStartVoice: () -> Unit = {},
+    onStopVoice: () -> Unit = {},
+    onCancelVoice: () -> Unit = {},
+    injectedText: String? = null,
+    onInjectedTextConsumed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var text by remember { mutableStateOf("") }
 
+    LaunchedEffect(injectedText) {
+        val incoming = injectedText
+        if (!incoming.isNullOrBlank()) {
+            text = if (text.isBlank()) incoming else "$text $incoming"
+            onInjectedTextConsumed()
+        }
+    }
+
     val inputState = when {
         isGenerating -> InputState.GENERATING
         text.isNotBlank() -> InputState.HAS_TEXT
+        voiceState != VoiceInputUiState.Unavailable -> InputState.MIC
         else -> InputState.EMPTY
     }
 
@@ -115,6 +136,14 @@ fun SmartChatInput(
             color = MaterialTheme.colorScheme.surfaceVariant,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         ) {
+            if (voiceState == VoiceInputUiState.Recording || voiceState == VoiceInputUiState.Transcribing) {
+                VoiceRecordingBar(
+                    voiceState = voiceState,
+                    onValidate = onStopVoice,
+                    onCancel = onCancelVoice
+                )
+                return@Surface
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -194,6 +223,23 @@ fun SmartChatInput(
                                 )
                             }
                         }
+                        InputState.MIC -> {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(36.dp),
+                                onClick = { if (isEnabled) onStartVoice() }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Mic,
+                                        contentDescription = stringResource(R.string.chat_voice_input),
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
                         InputState.HAS_TEXT -> {
                             Surface(
                                 shape = CircleShape,
@@ -252,4 +298,91 @@ fun MessageInput(
         isGenerating = false,
         onStopGeneration = {}
     )
+}
+
+@Composable
+private fun VoiceRecordingBar(
+    voiceState: VoiceInputUiState,
+    onValidate: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+            .heightIn(min = 52.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onCancel,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.chat_voice_cancel),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 36.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (voiceState == VoiceInputUiState.Transcribing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.chat_voice_transcribing),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .padding(0.dp)
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = CircleShape,
+                            modifier = Modifier.size(10.dp)
+                        ) {}
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.chat_voice_recording),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = if (voiceState == VoiceInputUiState.Recording)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+            modifier = Modifier.size(36.dp),
+            onClick = { if (voiceState == VoiceInputUiState.Recording) onValidate() }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = stringResource(R.string.chat_voice_validate),
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
 }

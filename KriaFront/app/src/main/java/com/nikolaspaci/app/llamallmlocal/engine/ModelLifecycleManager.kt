@@ -15,7 +15,8 @@ import javax.inject.Singleton
 
 @Singleton
 class ModelLifecycleManager @Inject constructor(
-    private val engine: ModelEngine
+    private val engine: ModelEngine,
+    private val speechEngine: SpeechEngine
 ) : DefaultLifecycleObserver {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -46,10 +47,20 @@ class ModelLifecycleManager @Inject constructor(
     }
 
     private suspend fun performUnload(reason: String) {
-        if (!engine.isModelLoaded()) return
-        Log.i(TAG, "Unloading model ($reason)")
-        engine.stopPredict()
-        engine.unloadModel()
+        var didWork = false
+        if (engine.isModelLoaded()) {
+            Log.i(TAG, "Unloading model ($reason)")
+            engine.stopPredict()
+            engine.unloadModel()
+            didWork = true
+        }
+        if (speechEngine.isLoaded()) {
+            Log.i(TAG, "Unloading whisper model ($reason)")
+            speechEngine.stop()
+            speechEngine.unloadModel()
+            didWork = true
+        }
+        if (!didWork) return
     }
 
     companion object {

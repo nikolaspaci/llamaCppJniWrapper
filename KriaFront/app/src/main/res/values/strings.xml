@@ -43,6 +43,13 @@
     <string name="chat_attach_image">Attach image</string>
     <string name="chat_send">Send</string>
     <string name="chat_stop_generation">Stop generation</string>
+    <string name="chat_voice_input">Voice input</string>
+    <string name="chat_voice_recording">Recording…</string>
+    <string name="chat_voice_transcribing">Transcribing…</string>
+    <string name="chat_voice_validate">Stop and transcribe</string>
+    <string name="chat_voice_cancel">Cancel voice input</string>
+    <string name="chat_voice_permission_denied">Microphone permission denied</string>
+    <string name="chat_voice_no_model">No speech-to-text model installed</string>
     <string name="chat_regenerate">Regenerate</string>
     <string name="chat_tokens_count">%1$d tokens</string>
     <string name="chat_stats_line">%1$.1f tokens/s · %2$ds · %3$d tokens</string>

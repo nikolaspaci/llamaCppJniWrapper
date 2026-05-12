@@ -21,18 +21,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.crashlytics.ktx.crashlytics
 import com.google.firebase.ktx.Firebase
 import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.ui.common.AdaptiveTopBar
 import com.nikolaspaci.app.llamallmlocal.ui.common.SmartChatInput
 import com.nikolaspaci.app.llamallmlocal.ui.common.ModelSelector
+import com.nikolaspaci.app.llamallmlocal.ui.common.VoiceInputUiState
 import com.nikolaspaci.app.llamallmlocal.viewmodel.HomeViewModel
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ModelFileViewModel
+import com.nikolaspaci.app.llamallmlocal.viewmodel.SpeechInputViewModel
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import kotlinx.coroutines.CancellationException
@@ -84,6 +88,31 @@ fun HomeChatScreen(
     val displayModelName = if (selectedModelPath.isNotEmpty()) {
         File(selectedModelPath).nameWithoutExtension
     } else ""
+
+    val speechViewModel: SpeechInputViewModel = hiltViewModel()
+    val speechState by speechViewModel.state.collectAsState()
+    val transcribedText by speechViewModel.transcribed.collectAsState()
+    val voiceAvailable = speechViewModel.hasWhisperModel()
+
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) speechViewModel.startRecording()
+    }
+
+    val voiceUi = when (speechState) {
+        is SpeechInputViewModel.UiState.Recording -> VoiceInputUiState.Recording
+        is SpeechInputViewModel.UiState.Transcribing -> VoiceInputUiState.Transcribing
+        else -> if (voiceAvailable) VoiceInputUiState.Idle else VoiceInputUiState.Unavailable
+    }
+
+    LaunchedEffect(speechState) {
+        val s = speechState
+        if (s is SpeechInputViewModel.UiState.Error) {
+            snackbarHostState.showSnackbar(s.message)
+            speechViewModel.dismissError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -147,6 +176,18 @@ fun HomeChatScreen(
                 onRemoveAttachment = {
                     pendingImageUri = null
                 },
+                voiceState = voiceUi,
+                onStartVoice = {
+                    if (speechViewModel.hasMicrophonePermission()) {
+                        speechViewModel.startRecording()
+                    } else {
+                        voicePermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                onStopVoice = { speechViewModel.stopRecording() },
+                onCancelVoice = { speechViewModel.cancel() },
+                injectedText = transcribedText,
+                onInjectedTextConsumed = { speechViewModel.consumeTranscribed() },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))

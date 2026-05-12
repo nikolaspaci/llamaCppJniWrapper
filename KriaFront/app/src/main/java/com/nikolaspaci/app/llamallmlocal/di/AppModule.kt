@@ -15,6 +15,8 @@ import com.nikolaspaci.app.llamallmlocal.engine.DefaultModelParameterProvider
 import com.nikolaspaci.app.llamallmlocal.engine.LlamaEngine
 import com.nikolaspaci.app.llamallmlocal.engine.ModelEngine
 import com.nikolaspaci.app.llamallmlocal.engine.ModelParameterProvider
+import com.nikolaspaci.app.llamallmlocal.engine.SpeechEngine
+import com.nikolaspaci.app.llamallmlocal.engine.WhisperEngine
 import com.nikolaspaci.app.llamallmlocal.data.curated.AppVersionCode
 import com.nikolaspaci.app.llamallmlocal.util.HardwareCapabilities
 import com.nikolaspaci.app.llamallmlocal.util.OptimalConfigurationService
@@ -153,4 +155,8 @@ abstract class EngineModule {
     @Binds
     @Singleton
     abstract fun bindModelParameterProvider(provider: DefaultModelParameterProvider): ModelParameterProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindSpeechEngine(engine: WhisperEngine): SpeechEngine
 }
