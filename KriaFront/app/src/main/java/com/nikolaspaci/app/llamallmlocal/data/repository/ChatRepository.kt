@@ -3,13 +3,17 @@ package com.nikolaspaci.app.llamallmlocal.data.repository
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import com.nikolaspaci.app.llamallmlocal.data.ImageStorageManager
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatDao
 import com.nikolaspaci.app.llamallmlocal.data.database.Conversation
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.ConversationWithMessages
 import kotlinx.coroutines.flow.Flow
 
-class ChatRepository(private val chatDao: ChatDao) {
+class ChatRepository(
+    private val chatDao: ChatDao,
+    private val imageStorageManager: ImageStorageManager
+) {
 
     fun getAllConversations(): Flow<List<ConversationWithMessages>> {
         return chatDao.getAllConversationsWithMessages()
@@ -33,6 +37,7 @@ class ChatRepository(private val chatDao: ChatDao) {
 
     suspend fun deleteConversation(conversation: Conversation) {
         chatDao.deleteConversation(conversation)
+        imageStorageManager.deleteConversationDir(conversation.id)
     }
 
     // Paged methods

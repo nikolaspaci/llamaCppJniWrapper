@@ -1,12 +1,10 @@
 package com.nikolaspaci.app.llamallmlocal.viewmodel
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nikolaspaci.app.llamallmlocal.data.ImageStorageManager
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.data.repository.ChatRepository
@@ -15,8 +13,6 @@ import com.nikolaspaci.app.llamallmlocal.engine.ModelParameterProvider
 import com.nikolaspaci.app.llamallmlocal.jni.PredictionEvent
 import com.nikolaspaci.app.llamallmlocal.usecase.PredictUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +21,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
 
@@ -83,7 +77,7 @@ class ChatViewModel @Inject constructor(
     private val engine: ModelEngine,
     private val predictUseCase: PredictUseCase,
     private val parameterProvider: ModelParameterProvider,
-    @ApplicationContext private val context: Context,
+    private val imageStorageManager: ImageStorageManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -108,11 +102,9 @@ class ChatViewModel @Inject constructor(
     private val _hasVision = MutableStateFlow(false)
     val hasVision: StateFlow<Boolean> = _hasVision.asStateFlow()
 
-    // Pending image attachment
+    // Pending image attachment (URI éphémère du picker, vit en mémoire jusqu'à l'envoi)
     private val _pendingImageUri = MutableStateFlow<Uri?>(null)
     val pendingImageUri: StateFlow<Uri?> = _pendingImageUri.asStateFlow()
-
-    private var pendingImageData: ByteArray? = null
 
     init {
         observeConversation()
@@ -196,28 +188,8 @@ class ChatViewModel @Inject constructor(
     private suspend fun triggerPendingPredictionIfNeeded() {
         val lastMessage = currentMessages.lastOrNull() ?: return
         if (lastMessage.sender == Sender.USER) {
-            val mediaBytes = decodeMediaBytes(lastMessage.mediaPath)
+            val mediaBytes = lastMessage.mediaPath?.let { imageStorageManager.readBytes(it) }
             startPrediction(lastMessage.message, mediaBytes)
-        }
-    }
-
-    private suspend fun decodeMediaBytes(mediaPath: String?): ByteArray? {
-        if (mediaPath == null) return null
-        return withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(mediaPath)
-                val bitmap: Bitmap? = context.contentResolver.openInputStream(uri)?.use { stream ->
-                    BitmapFactory.decodeStream(stream)
-                }
-                bitmap?.let {
-                    val output = ByteArrayOutputStream()
-                    it.compress(Bitmap.CompressFormat.PNG, 100, output)
-                    it.recycle()
-                    output.toByteArray()
-                }
-            } catch (_: Exception) {
-                null
-            }
         }
     }
 
@@ -230,33 +202,31 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun attachImage(uri: Uri, imageBytes: ByteArray) {
+    fun attachImage(uri: Uri) {
         _pendingImageUri.value = uri
-        pendingImageData = imageBytes
     }
 
     fun removeAttachment() {
         _pendingImageUri.value = null
-        pendingImageData = null
     }
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
 
-        val imageData = pendingImageData
         val imageUri = _pendingImageUri.value
-
-        // Clear attachment
         _pendingImageUri.value = null
-        pendingImageData = null
 
         viewModelScope.launch {
+            val stored = imageUri?.let { uri ->
+                runCatching { imageStorageManager.copyFromUri(uri, conversationId) }.getOrNull()
+            }
+
             val userMessage = ChatMessage(
                 conversationId = conversationId,
                 sender = Sender.USER,
                 message = text.trim(),
-                mediaPath = imageUri?.toString(),
-                mediaType = if (imageUri != null) "image" else null
+                mediaPath = stored?.relativePath,
+                mediaType = stored?.mimeType
             )
 
             // Optimistically add user message so it appears immediately
@@ -268,6 +238,7 @@ class ChatViewModel @Inject constructor(
 
             chatRepository.addMessageToConversation(userMessage)
 
+            val imageData = stored?.relativePath?.let { imageStorageManager.readBytes(it) }
             startPrediction(text.trim(), imageData)
         }
     }
@@ -395,7 +366,7 @@ class ChatViewModel @Inject constructor(
     fun retry() {
         val lastUserMessage = currentMessages.lastOrNull { it.sender == Sender.USER } ?: return
         viewModelScope.launch {
-            val mediaBytes = decodeMediaBytes(lastUserMessage.mediaPath)
+            val mediaBytes = lastUserMessage.mediaPath?.let { imageStorageManager.readBytes(it) }
             startPrediction(lastUserMessage.message, mediaBytes)
         }
     }

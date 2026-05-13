@@ -3,8 +3,8 @@ package com.nikolaspaci.app.llamallmlocal.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,13 +35,15 @@ import com.nikolaspaci.app.llamallmlocal.R
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats
+import java.io.File
 
 @Composable
 fun MessageRow(
     message: ChatMessage,
     stats: Stats? = null,
     onCopyMessage: ((String) -> Unit)? = null,
-    onRegenerateMessage: (() -> Unit)? = null
+    onRegenerateMessage: (() -> Unit)? = null,
+    onImageClick: ((File) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -60,13 +62,19 @@ fun MessageRow(
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                     // Show attached image if present
-                    if (message.mediaPath != null) {
+                    val imageFile = message.mediaPath?.let { File(context.filesDir, it) }
+                    if (imageFile != null && imageFile.exists()) {
                         Image(
-                            painter = rememberAsyncImagePainter(Uri.parse(message.mediaPath)),
+                            painter = rememberAsyncImagePainter(imageFile),
                             contentDescription = stringResource(R.string.chat_attached_image),
                             modifier = Modifier
                                 .size(150.dp)
-                                .clip(RoundedCornerShape(12.dp)),
+                                .clip(RoundedCornerShape(12.dp))
+                                .then(
+                                    if (onImageClick != null) {
+                                        Modifier.clickable { onImageClick(imageFile) }
+                                    } else Modifier
+                                ),
                             contentScale = ContentScale.Crop
                         )
                         Spacer(modifier = Modifier.height(8.dp))

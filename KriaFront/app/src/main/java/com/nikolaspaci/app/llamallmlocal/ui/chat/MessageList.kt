@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.nikolaspaci.app.llamallmlocal.data.database.ChatMessage
 import com.nikolaspaci.app.llamallmlocal.data.database.Sender
 import com.nikolaspaci.app.llamallmlocal.viewmodel.Stats
+import java.io.File
 
 data class StreamingState(
     val currentText: String,
@@ -34,6 +35,7 @@ fun MessageList(
     onCancelGeneration: () -> Unit,
     onCopyMessage: ((String) -> Unit)? = null,
     onRegenerateResponse: (() -> Unit)? = null,
+    onImageClick: ((File) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -92,7 +94,8 @@ fun MessageList(
                 message = message,
                 stats = if (isLastBotMessage) lastMessageStats else null,
                 onCopyMessage = onCopyMessage,
-                onRegenerateMessage = if (isLastBotMessage) onRegenerateResponse else null
+                onRegenerateMessage = if (isLastBotMessage) onRegenerateResponse else null,
+                onImageClick = onImageClick
             )
         }
 

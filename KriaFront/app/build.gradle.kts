@@ -148,6 +148,7 @@ dependencies {
     // Markdown
     implementation(libs.compose.markdown)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.exifinterface)
 
     // OkHttp + Gson
     implementation(libs.okhttp)

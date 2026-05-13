@@ -43,6 +43,7 @@ import com.nikolaspaci.app.llamallmlocal.ui.home.HomeChatScreen
 import com.nikolaspaci.app.llamallmlocal.ui.huggingface.HuggingFaceScreen
 import com.nikolaspaci.app.llamallmlocal.ui.models.ModelManagementScreen
 import com.nikolaspaci.app.llamallmlocal.ui.settings.AppSettingsScreen
+import com.nikolaspaci.app.llamallmlocal.ui.settings.ImagesSettingsScreen
 import com.nikolaspaci.app.llamallmlocal.ui.settings.SettingsScreen
 import com.nikolaspaci.app.llamallmlocal.ui.settings.VoiceSettingsScreen
 import com.nikolaspaci.app.llamallmlocal.viewmodel.ChatViewModel
@@ -72,6 +73,7 @@ sealed class Screen(val route: String) {
     object ModelManagement : Screen("model_management")
     object AppSettings : Screen("app_settings")
     object VoiceSettings : Screen("voice_settings")
+    object ImagesSettings : Screen("images_settings")
 }
 
 @Composable
@@ -264,11 +266,17 @@ fun AppNavigation(factory: ViewModelFactory) {
                 AppSettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToManageModels = { navController.navigate(Screen.ModelManagement.route) },
-                    onNavigateToVoiceSettings = { navController.navigate(Screen.VoiceSettings.route) }
+                    onNavigateToVoiceSettings = { navController.navigate(Screen.VoiceSettings.route) },
+                    onNavigateToImagesSettings = { navController.navigate(Screen.ImagesSettings.route) }
                 )
             }
             composable(Screen.VoiceSettings.route) {
                 VoiceSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.ImagesSettings.route) {
+                ImagesSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

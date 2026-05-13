@@ -53,6 +53,7 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val hasVision by viewModel.hasVision.collectAsState()
     val pendingImageUri by viewModel.pendingImageUri.collectAsState()
+    var fullscreenImage by remember { mutableStateOf<File?>(null) }
 
     val speechViewModel: SpeechInputViewModel = hiltViewModel()
     val speechState by speechViewModel.state.collectAsState()
@@ -84,21 +85,7 @@ fun ChatScreen(
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
-            try {
-                val bitmap = android.graphics.BitmapFactory.decodeStream(
-                    context.contentResolver.openInputStream(it)
-                )
-                if (bitmap != null) {
-                    val stream = java.io.ByteArrayOutputStream()
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
-                    bitmap.recycle()
-                    viewModel.attachImage(it, stream.toByteArray())
-                }
-            } catch (e: Exception) {
-                // Ignore errors reading image
-            }
-        }
+        uri?.let { viewModel.attachImage(it) }
     }
 
     LaunchedEffect(viewModelModelPath) {
@@ -202,6 +189,7 @@ fun ChatScreen(
                         onCancelGeneration = {},
                         onCopyMessage = { text -> copyToClipboard(context, text) },
                         onRegenerateResponse = { viewModel.retry() },
+                        onImageClick = { fullscreenImage = it },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
@@ -221,6 +209,7 @@ fun ChatScreen(
                     lastMessageStats = null,
                     onCancelGeneration = { viewModel.cancelPrediction() },
                     onCopyMessage = { text -> copyToClipboard(context, text) },
+                    onImageClick = { fullscreenImage = it },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -235,6 +224,7 @@ fun ChatScreen(
                     onCancelGeneration = {},
                     onCopyMessage = { text -> copyToClipboard(context, text) },
                     onRegenerateResponse = { viewModel.retry() },
+                    onImageClick = { fullscreenImage = it },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -256,6 +246,7 @@ fun ChatScreen(
                             lastMessageStats = null,
                             onCancelGeneration = {},
                             onCopyMessage = { text -> copyToClipboard(context, text) },
+                            onImageClick = { fullscreenImage = it },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -271,6 +262,13 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    fullscreenImage?.let { file ->
+        ImageFullScreenViewer(
+            imageFile = file,
+            onDismiss = { fullscreenImage = null }
+        )
     }
 }
 

@@ -63,8 +63,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideChatRepository(chatDao: ChatDao): ChatRepository {
-        return ChatRepository(chatDao)
+    fun provideChatRepository(
+        chatDao: ChatDao,
+        imageStorageManager: com.nikolaspaci.app.llamallmlocal.data.ImageStorageManager
+    ): ChatRepository {
+        return ChatRepository(chatDao, imageStorageManager)
     }
 
     @Provides

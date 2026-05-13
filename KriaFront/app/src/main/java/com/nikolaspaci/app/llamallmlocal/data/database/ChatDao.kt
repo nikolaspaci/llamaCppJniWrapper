@@ -69,6 +69,9 @@ interface ChatDao {
 
     @Query("SELECT modelParameterId FROM conversations WHERE id = :conversationId")
     suspend fun getConversationModelParameterId(conversationId: Long): Long?
+
+    @Query("UPDATE chat_messages SET mediaPath = NULL, mediaType = NULL WHERE mediaPath IS NOT NULL")
+    suspend fun clearAllMediaReferences(): Int
 }
 
 data class ConversationWithMessages(

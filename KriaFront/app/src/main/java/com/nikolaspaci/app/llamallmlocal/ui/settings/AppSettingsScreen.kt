@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.MicNone
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +40,8 @@ import com.nikolaspaci.app.llamallmlocal.R
 fun AppSettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToManageModels: () -> Unit,
-    onNavigateToVoiceSettings: () -> Unit
+    onNavigateToVoiceSettings: () -> Unit,
+    onNavigateToImagesSettings: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -75,6 +77,12 @@ fun AppSettingsScreen(
                 title = stringResource(R.string.app_settings_voice_section),
                 description = stringResource(R.string.app_settings_voice_description),
                 onClick = onNavigateToVoiceSettings
+            )
+            SettingsNavigationRow(
+                icon = Icons.Rounded.Image,
+                title = stringResource(R.string.app_settings_images_section),
+                description = stringResource(R.string.app_settings_images_description),
+                onClick = onNavigateToImagesSettings
             )
         }
     }
